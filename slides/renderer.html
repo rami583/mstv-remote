@@ -7,9 +7,33 @@
     <style>
       :root {
         color-scheme: dark;
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #050505;
-        color: #f8fafc;
+        --bg: #04101c;
+        --bg-soft: #0c1b2d;
+        --panel: rgba(8, 18, 31, 0.82);
+        --line: rgba(141, 240, 204, 0.18);
+        --text: #edf4ff;
+        --muted: #9fb2ca;
+        --green: #10b981;
+        --red: #ff5a36;
+        --yellow: #f59e0b;
+        --blue: #0ea5e9;
+        --badge-height: 32px;
+        --badge-padding-x: 12px;
+        --badge-font-size: 12px;
+        --badge-font-weight: 600;
+        --badge-letter-spacing: 0.08em;
+        --badge-radius: 999px;
+        --label-font-size: 12px;
+        --label-letter-spacing: 0.12em;
+        --label-color: var(--muted);
+        --button-height: 36px;
+        --button-padding-x: 14px;
+        --button-font-size: 12px;
+        --button-font-weight: 600;
+        --button-radius: 999px;
+        font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg);
+        color: var(--text);
       }
 
       * {
@@ -26,8 +50,10 @@
 
       body {
         background:
-          radial-gradient(circle at 50% 12%, rgba(148, 163, 184, 0.18), transparent 30%),
-          linear-gradient(145deg, #030303 0%, #111827 100%);
+          radial-gradient(circle at top left, rgba(247, 181, 0, 0.16), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(141, 240, 204, 0.12), transparent 32%),
+          linear-gradient(135deg, rgba(3, 9, 17, 0.92), rgba(7, 17, 31, 0.98)),
+          var(--bg);
       }
 
       main {
@@ -37,7 +63,7 @@
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        padding: 10px;
+        padding: 12px;
       }
 
       .card {
@@ -47,65 +73,65 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        gap: 12px;
+        border: 1px solid var(--line);
         border-radius: 22px;
-        background: rgba(0, 0, 0, 0.62);
-        padding: 18px 16px;
+        background: var(--panel);
+        padding: 18px;
         text-align: center;
         box-shadow: 0 28px 90px rgba(0, 0, 0, 0.36);
         backdrop-filter: blur(18px);
       }
 
       h1 {
-        margin: 0 0 14px;
+        margin: 0;
         max-width: 100%;
-        font-size: 34px;
-        line-height: 0.96;
-        letter-spacing: -0.04em;
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: -0.03em;
       }
 
       .status {
         display: inline-flex;
         align-items: center;
-        gap: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 999px;
+        gap: 8px;
+        height: var(--badge-height);
+        border: 1px solid transparent;
+        border-radius: var(--badge-radius);
         max-width: 100%;
-        padding: 10px 16px;
-        font-size: 13px;
-        font-weight: 900;
-        letter-spacing: 0.22em;
+        padding: 0 var(--badge-padding-x);
+        color: white;
+        font-size: var(--badge-font-size);
+        font-weight: var(--badge-font-weight);
+        letter-spacing: var(--badge-letter-spacing);
+        line-height: 1;
         text-transform: uppercase;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
       }
 
       .dot {
         display: block;
-        width: 14px;
-        height: 14px;
+        width: 8px;
+        height: 8px;
         border-radius: 999px;
+        background: currentColor;
         box-shadow: 0 0 24px currentColor;
       }
 
       .connected {
-        border-color: rgba(34, 197, 94, 0.34);
-        background: rgba(34, 197, 94, 0.12);
-        color: #86efac;
+        background: var(--green);
       }
 
       .waiting {
-        border-color: rgba(251, 191, 36, 0.34);
-        background: rgba(251, 191, 36, 0.12);
-        color: #fde68a;
+        background: var(--yellow);
       }
 
       .disconnected {
-        border-color: rgba(248, 113, 113, 0.38);
-        background: rgba(248, 113, 113, 0.13);
-        color: #fca5a5;
+        background: var(--red);
       }
 
       .details {
-        margin-top: 12px;
         max-width: 100%;
       }
 
@@ -115,21 +141,24 @@
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        margin-top: 12px;
-        color: #94a3b8;
-        font-size: 10px;
-        letter-spacing: 0.14em;
+        color: var(--label-color);
+        font-size: var(--label-font-size);
+        font-weight: 600;
+        letter-spacing: var(--label-letter-spacing);
+        line-height: 1;
         text-transform: uppercase;
       }
 
       select {
         min-width: 150px;
         border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 999px;
-        background: #050505;
-        padding: 7px 10px;
-        color: #f8fafc;
-        font-size: 11px;
+        border-radius: var(--button-radius);
+        background: #000;
+        height: var(--button-height);
+        padding: 0 var(--button-padding-x);
+        color: var(--text);
+        font-size: var(--button-font-size);
+        font-weight: var(--button-font-weight);
         outline: none;
       }
 
@@ -137,7 +166,6 @@
         display: grid;
         width: min(100%, 360px);
         gap: 5px;
-        margin-top: 14px;
         text-align: left;
       }
 
@@ -147,14 +175,14 @@
         gap: 12px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         padding-bottom: 4px;
-        color: #94a3b8;
-        font-size: 10px;
+        color: var(--muted);
+        font-size: 11px;
         line-height: 1.2;
       }
 
       .diagnostic-value {
         max-width: 210px;
-        color: #f8fafc;
+        color: var(--text);
         overflow: hidden;
         text-align: right;
         text-overflow: ellipsis;
@@ -162,34 +190,44 @@
       }
 
       .diagnostic-value.ok {
-        color: #86efac;
+        color: var(--green);
       }
 
       .diagnostic-value.warn {
-        color: #fde68a;
+        color: var(--yellow);
       }
 
       .diagnostic-value.error {
-        color: #fca5a5;
+        color: var(--red);
       }
 
       button {
         cursor: pointer;
         border: 1px solid rgba(255, 255, 255, 0.14);
-        border-radius: 999px;
+        border-radius: var(--button-radius);
         background: rgba(255, 255, 255, 0.08);
-        padding: 10px 14px;
+        height: var(--button-height);
+        padding: 0 var(--button-padding-x);
         color: white;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.18em;
+        font-size: var(--button-font-size);
+        font-weight: var(--button-font-weight);
+        letter-spacing: var(--badge-letter-spacing);
+        line-height: 1;
         text-transform: uppercase;
+        transition:
+          background 160ms ease,
+          border-color 160ms ease;
+      }
+
+      button:hover {
+        border-color: rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.14);
       }
 
       .problem {
         margin: 8px auto 0;
         max-width: 280px;
-        color: #fca5a5;
+        color: #ffb7a6;
         font-size: 12px;
         line-height: 1.25;
         overflow-wrap: anywhere;
@@ -215,8 +253,8 @@
           <span>Application</span>
           <select id="target-app-select">
             <option value="Microsoft PowerPoint">PowerPoint</option>
+            <option value="Preview">Aperçu</option>
             <option value="Keynote">Keynote</option>
-            <option value="Preview">Aperçu / Preview</option>
           </select>
         </label>
 
