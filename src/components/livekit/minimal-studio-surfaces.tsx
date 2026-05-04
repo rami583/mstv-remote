@@ -1418,69 +1418,73 @@ function ControlGuestGridContent({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div
-                    className="flex min-w-0 flex-wrap items-center justify-end gap-1.5"
+                    className="flex min-w-0 flex-col items-end gap-1.5"
                     onClick={(event) => event.stopPropagation()}
                     onPointerDown={(event) => event.stopPropagation()}
                   >
-                    {(["STUDIO", "REGIE", "IMAGE"] as const).map((source) => {
-                      const isActive = guest.effectiveReturnSource === source;
+                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+                      {(["STUDIO", "REGIE", "IMAGE"] as const).map((source) => {
+                        const isActive = guest.effectiveReturnSource === source;
 
-                      return (
-                        <button
-                          key={source}
-                          type="button"
-                          disabled={guest.returnSourceControlDisabled}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onSelectGuestReturnSource?.(guest.participantId, source);
-                          }}
-                          className={`${pillBaseClassName} transition ${
-                            isActive ? sourcePillClassNames[source] : neutralPillClassName
-                          } ${
-                            guest.returnSourceControlDisabled ? "cursor-default opacity-90" : ""
-                          }`}
-                        >
-                          {source}
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onToggleGuestSlideControl?.(guest.participantId);
-                      }}
-                      className={`${pillBaseClassName} transition ${
-                        guest.slideControlEnabled
-                          ? "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
-                          : neutralPillClassName
-                      }`}
-                    >
-                      Slides
-                    </button>
-                    <button
-                      type="button"
-                      disabled={guest.disconnectControlDisabled}
-                      title={
-                        guest.disconnectControlDisabled
-                          ? "Retirez l’invité du programme avant de le déconnecter."
-                          : undefined
-                      }
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (guest.disconnectControlDisabled) {
-                          return;
+                        return (
+                          <button
+                            key={source}
+                            type="button"
+                            disabled={guest.returnSourceControlDisabled}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onSelectGuestReturnSource?.(guest.participantId, source);
+                            }}
+                            className={`${pillBaseClassName} transition ${
+                              isActive ? sourcePillClassNames[source] : neutralPillClassName
+                            } ${
+                              guest.returnSourceControlDisabled ? "cursor-default opacity-90" : ""
+                            }`}
+                          >
+                            {source}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleGuestSlideControl?.(guest.participantId);
+                        }}
+                        className={`${pillBaseClassName} transition ${
+                          guest.slideControlEnabled
+                            ? "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+                            : neutralPillClassName
+                        }`}
+                      >
+                        Slides
+                      </button>
+                      <button
+                        type="button"
+                        disabled={guest.disconnectControlDisabled}
+                        title={
+                          guest.disconnectControlDisabled
+                            ? "Retirez l’invité du programme avant de le déconnecter."
+                            : undefined
                         }
-                        onDisconnectGuest?.(guest.participantId);
-                      }}
-                      className={`${pillBaseClassName} border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition ${
-                        guest.disconnectControlDisabled
-                          ? "cursor-default opacity-40"
-                          : "hover:bg-slate-500"
-                      }`}
-                    >
-                      Déconnecter
-                    </button>
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (guest.disconnectControlDisabled) {
+                            return;
+                          }
+                          onDisconnectGuest?.(guest.participantId);
+                        }}
+                        className={`${pillBaseClassName} border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition ${
+                          guest.disconnectControlDisabled
+                            ? "cursor-default opacity-40"
+                            : "hover:bg-slate-500"
+                        }`}
+                      >
+                        Déconnecter
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
