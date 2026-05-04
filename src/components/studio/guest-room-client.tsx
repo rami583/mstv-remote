@@ -599,13 +599,15 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
 
   return (
     <main className="h-[100svh] overflow-hidden bg-black text-white">
-      <div className="relative mx-auto flex h-full w-full items-center justify-center p-2">
+      <div className="relative mx-auto flex h-full w-full flex-col items-center justify-center gap-3 p-2">
         <div
           className="relative aspect-video overflow-hidden rounded-[14px] bg-black"
           style={{
-            maxHeight: "calc(100svh - 1rem)",
+            maxHeight: slideControlAuthorized ? "calc(100svh - 6.75rem)" : "calc(100svh - 1rem)",
             maxWidth: "1180px",
-            width: "min(1180px, calc((100svh - 1rem) * 1.77778), 100%)"
+            width: slideControlAuthorized
+              ? "min(1180px, calc((100svh - 6.75rem) * 1.77778), 100%)"
+              : "min(1180px, calc((100svh - 1rem) * 1.77778), 100%)"
           }}
         >
           <GuestProgramReturnSurface
@@ -668,28 +670,30 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
             </div>
           ) : null}
 
-          {slideControlAuthorized ? (
-            <div className="absolute left-2 top-2 z-20 flex gap-1.5">
+        </div>
+        {slideControlAuthorized ? (
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+              Télécommande slides
+            </p>
+            <div className="flex items-center justify-center gap-3">
               <button
                 type="button"
                 onClick={() => handleSlideCommand("PREV_SLIDE")}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/70 text-base text-white backdrop-blur transition hover:bg-white/10"
-                aria-label="Slide précédent"
+                className="rounded-full border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/15"
               >
-                ←
+                ← Précédent
               </button>
               <button
                 type="button"
                 onClick={() => handleSlideCommand("NEXT_SLIDE")}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/70 text-base text-white backdrop-blur transition hover:bg-white/10"
-                aria-label="Slide suivant"
+                className="rounded-full border border-air/30 bg-air/10 px-5 py-2.5 text-sm font-medium text-air transition hover:bg-air/15"
               >
-                →
+                Suivant →
               </button>
             </div>
-          ) : null}
-
-        </div>
+          </div>
+        ) : null}
       </div>
     </main>
   );
