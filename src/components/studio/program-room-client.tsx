@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProgramOutputSurface } from "@/components/livekit/minimal-studio-surfaces";
 import { fetchLiveKitToken } from "@/lib/livekit/browser-token";
 import { buildParticipantIdentity } from "@/lib/livekit/identity";
@@ -25,7 +25,6 @@ export function ProgramRoomClient({ room }: ProgramRoomClientProps) {
   );
   const [session, setSession] = useState<TokenResponsePayload | null>(null);
   const [programGuestIds, setProgramGuestIds] = useState<string[]>([]);
-  const lastSceneSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -44,19 +43,10 @@ export function ProgramRoomClient({ room }: ProgramRoomClientProps) {
         return;
       }
 
-      console.info("[MSTV Program] LiveKit session ready", JSON.stringify({
-        roomName: token.roomName,
-        participantId: token.participantId
-      }));
       setSession(token);
     }
 
-    void loadSession().catch((error) => {
-      console.info(
-        "[MSTV Program] LiveKit session failed",
-        error instanceof Error ? error.message : String(error)
-      );
-    });
+    void loadSession().catch(() => undefined);
 
     return () => {
       active = false;
@@ -74,27 +64,11 @@ export function ProgramRoomClient({ room }: ProgramRoomClientProps) {
       }
 
       const nextGuestIds = snapshot.programGuestIds.slice(0, 3);
-      const signature = JSON.stringify(nextGuestIds);
-
-      if (lastSceneSignatureRef.current !== signature) {
-        lastSceneSignatureRef.current = signature;
-        console.info("[MSTV Program] Scene updated", JSON.stringify({
-          room: snapshot.room,
-          selectedGuestCount: nextGuestIds.length,
-          programGuestIds: nextGuestIds
-        }));
-      }
-
       setProgramGuestIds(nextGuestIds);
     }
 
     const refreshSceneSafely = () => {
-      void refreshScene().catch((error) => {
-        console.info(
-          "[MSTV Program] Scene refresh failed",
-          error instanceof Error ? error.message : String(error)
-        );
-      });
+      void refreshScene().catch(() => undefined);
     };
 
     refreshSceneSafely();

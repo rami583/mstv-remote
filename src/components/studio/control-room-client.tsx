@@ -809,30 +809,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           REGIE: regieReturnToken,
           IMAGE: imageReturnToken
         });
-        console.info("[MSTV Desktop] LiveKit sessions", JSON.stringify({
-          contribution: {
-            roomName: monitorToken.roomName,
-            participantId: monitorToken.participantId
-          },
-          programRouting: {
-            roomName: programRoutingToken.roomName,
-            participantId: programRoutingToken.participantId
-          },
-          returnFeeds: {
-            STUDIO: {
-              roomName: studioReturnToken.roomName,
-              participantId: studioReturnToken.participantId
-            },
-            REGIE: {
-              roomName: regieReturnToken.roomName,
-              participantId: regieReturnToken.participantId
-            },
-            IMAGE: {
-              roomName: imageReturnToken.roomName,
-              participantId: imageReturnToken.participantId
-            }
-          }
-        }));
       } catch (requestError) {
         if (!active) {
           return;
@@ -1237,18 +1213,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       return nextGuests;
     });
   }, []);
-
-  useEffect(() => {
-    console.info("[MSTV Desktop] Live contribution guests", JSON.stringify({
-      count: liveGuestStates.length,
-      guests: liveGuestStates.map((guest) => ({
-        participantId: guest.participantId,
-        displayName: guest.displayName,
-        cameraPublished: guest.cameraPublished,
-        microphonePublished: guest.microphonePublished
-      }))
-    }));
-  }, [liveGuestStates]);
 
   const routingPayload = useMemo(
     () =>

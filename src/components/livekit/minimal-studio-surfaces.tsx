@@ -370,36 +370,11 @@ function ProgramReturnContent({
   const assignedAudioTracks = concreteAudioTracks.filter((trackRef) =>
     assignedParticipantIds.has(trackRef.participant.identity)
   );
-  const assignedParticipantIdSignature = [...assignedParticipantIds].join("|");
   const lastPublishedSlideCommandRef = useRef<string | null>(null);
 
   useEffect(() => {
     onAssignedReturnSourceChange?.(effectiveAssignedReturnSource);
   }, [effectiveAssignedReturnSource, onAssignedReturnSourceChange]);
-
-  useEffect(() => {
-    console.info("[MSTV Guest] Return subscription state", JSON.stringify({
-      assignedReturnSource,
-      effectiveAssignedReturnSource,
-      metadataReturnSource,
-      metadataReturnVersion,
-      routedReturnSource: routedReturn?.source ?? null,
-      routedReturnVersion: routedReturn?.version ?? null,
-      programFeedParticipantIds: [...assignedParticipantIds],
-      hasVideoTrack: Boolean(primaryTrack),
-      audioTrackCount: assignedAudioTracks.length
-    }));
-  }, [
-    assignedAudioTracks.length,
-    assignedParticipantIdSignature,
-    assignedReturnSource,
-    effectiveAssignedReturnSource,
-    metadataReturnSource,
-    metadataReturnVersion,
-    primaryTrack,
-    routedReturn?.source,
-    routedReturn?.version
-  ]);
 
   useEffect(() => {
     for (const participant of remoteParticipants) {
@@ -453,15 +428,6 @@ function ProgramReturnContent({
         );
         onProgramStatusChange?.(nextIsInProgram);
         onSlideControlAuthorizedChange?.(nextCanControlSlides);
-        console.info("[MSTV Guest] Program status sync", JSON.stringify({
-          localProgramIdentity: localParticipant.identity,
-          localProgramSid: localParticipant.sid,
-          contributionParticipantId,
-          programGuestIds: parsed.programGuestIds,
-          slideControlEnabledGuestIds: parsed.slideControlEnabledGuestIds ?? [],
-          isInProgram: nextIsInProgram,
-          canControlSlides: nextCanControlSlides
-        }));
 
         const nextSource = nextIsInProgram
           ? "STUDIO"
@@ -587,18 +553,7 @@ function ProgramRoutingBridgeContent({
           "Content-Type": "application/json"
         },
         body: signature
-      })
-        .then(async (response) => {
-          if (!response.ok) {
-            console.info("[MSTV Desktop] Return routing metadata sync failed", await response.text());
-          }
-        })
-        .catch((error) => {
-          console.info(
-            "[MSTV Desktop] Return routing metadata sync failed",
-            error instanceof Error ? error.message : String(error)
-          );
-        });
+      }).catch(() => undefined);
     };
 
     if (lastPayloadSignatureRef.current === signature) {
@@ -610,7 +565,6 @@ function ProgramRoutingBridgeContent({
     }
 
     lastPayloadSignatureRef.current = signature;
-    console.info("[MSTV Desktop] Return routing published", signature);
     publishRouting();
     const interval = window.setInterval(publishRouting, 2000);
 
@@ -752,12 +706,7 @@ function RoutedAudioTrack({
       await element.play();
     };
 
-    void setOutputDevice().catch((error) => {
-      console.info(
-        "[MSTV Control] Audio output routing failed",
-        error instanceof Error ? error.message : String(error)
-      );
-    });
+    void setOutputDevice().catch(() => undefined);
 
     return () => {
       track.detach(element);
@@ -923,11 +872,6 @@ export function ControlReturnFeedPublisher({
 
         publisherRoomRef.current = room;
         setPublisherConnectionState("connected");
-        console.info("[MSTV Desktop] Return publisher connected", JSON.stringify({
-          roomName: session.roomName,
-          participantId: session.participantId,
-          sourceLabel: session.displayName
-        }));
         onStateChangeRef.current?.({
           connectionState: "connected",
           error: null
@@ -939,12 +883,6 @@ export function ControlReturnFeedPublisher({
         }
 
         setPublisherConnectionState("failed");
-        console.info("[MSTV Desktop] Return publisher connect failed", JSON.stringify({
-          roomName: session.roomName,
-          participantId: session.participantId,
-          sourceLabel: session.displayName,
-          error: error instanceof Error ? error.message : String(error)
-        }));
         onStateChangeRef.current?.({
           connectionState: "failed",
           videoActive: false,
@@ -1040,11 +978,6 @@ export function ControlReturnFeedPublisher({
       let nextStream: MediaStream;
 
       if (hasImage) {
-        console.info("[MSTV Desktop] Return publisher preparing image source", JSON.stringify({
-          roomName: activeSession.roomName,
-          participantId: activeSession.participantId,
-          sourceLabel: activeSession.displayName
-        }));
         const image = await new Promise<HTMLImageElement>((resolve, reject) => {
           const nextImage = new Image();
           nextImage.onload = () => resolve(nextImage);
@@ -1086,13 +1019,6 @@ export function ControlReturnFeedPublisher({
         imageRefreshIntervalRef.current = window.setInterval(drawFrame, 1000);
         nextStream = canvas.captureStream(1);
       } else {
-        console.info("[MSTV Desktop] Return publisher requesting media", JSON.stringify({
-          roomName: activeSession.roomName,
-          participantId: activeSession.participantId,
-          sourceLabel: activeSession.displayName,
-          videoDeviceId,
-          audioDeviceId
-        }));
         nextStream = await navigator.mediaDevices.getUserMedia({
           video: hasVideo ? { deviceId: { exact: videoDeviceId ?? undefined } } : false,
           audio: hasAudio ? { deviceId: { exact: audioDeviceId ?? undefined } } : false
@@ -1144,24 +1070,6 @@ export function ControlReturnFeedPublisher({
         publishedAudioTrackRef.current = nextAudioTrack;
       }
 
-      console.info("[MSTV Desktop] Return publisher tracks published", JSON.stringify({
-        roomName: activeSession.roomName,
-        participantId: activeSession.participantId,
-        sourceLabel: activeSession.displayName,
-        videoTrack: nextVideoTrack
-          ? {
-              readyState: nextVideoTrack.readyState,
-              muted: nextVideoTrack.muted
-            }
-          : null,
-        audioTrack: nextAudioTrack
-          ? {
-              readyState: nextAudioTrack.readyState,
-              muted: nextAudioTrack.muted
-            }
-          : null
-      }));
-
       onStateChangeRef.current?.({
         videoActive: Boolean(nextVideoTrack),
         audioActive: Boolean(nextAudioTrack),
@@ -1186,12 +1094,6 @@ export function ControlReturnFeedPublisher({
         audioActive: false,
         error: getMediaCaptureErrorMessage(error)
       });
-      console.info("[MSTV Desktop] Return publisher media failed", JSON.stringify({
-        roomName: session?.roomName ?? null,
-        participantId: session?.participantId ?? null,
-        sourceLabel: session?.displayName ?? null,
-        error: getMediaCaptureErrorMessage(error)
-      }));
     });
 
     return () => {
