@@ -600,7 +600,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [returnInputsEnabled, setReturnInputsEnabled] = useState(false);
   const [presentGuestIds, setPresentGuestIds] = useState<string[] | null>(null);
   const [liveGuestStates, setLiveGuestStates] = useState<RuntimeParticipantState[]>([]);
-  const [slideCommandFeedbacks, setSlideCommandFeedbacks] = useState<SlideCommandFeedback[]>([]);
   const [returnFeedPublisherStates, setReturnFeedPublisherStates] = useState<
     Record<ReturnSource, ReturnFeedPublisherState>
   >({
@@ -656,6 +655,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     state: "idle",
     message: "Receiver non configuré"
   });
+  const [lastSlideCommandFeedback, setLastSlideCommandFeedback] = useState<SlideCommandFeedback | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshMediaDevices = useCallback(async (requestPermissions: boolean) => {
@@ -1179,6 +1179,11 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const guestPublicLink = desktopConfig
     ? `${desktopConfig.guestPublicBaseUrl.replace(/\/+$/, "")}/guest/${encodeURIComponent(room)}`
     : null;
+  const slideReceiverCompactStatus = slideReceiverHost.trim()
+    ? slideReceiverStatus.state === "error" || slideReceiverStatus.state === "not-configured"
+      ? "erreur"
+      : "connecté"
+    : "non configuré";
   const controlTileGridClassName = isDesktopRuntime
     ? "grid grid-cols-3 gap-4"
     : "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))]";
@@ -1429,19 +1434,14 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         ? `Slide suivante demandé par ${message.guestName}`
         : `Slide précédente demandé par ${message.guestName}`;
 
-    setSlideCommandFeedbacks((current) => [
-      {
-        id: message.commandId,
-        label
-      },
-      ...current.filter((item) => item.id !== message.commandId)
-    ].slice(0, 3));
+    setLastSlideCommandFeedback({
+      id: message.commandId,
+      label
+    });
 
     window.setTimeout(() => {
-      setSlideCommandFeedbacks((current) =>
-        current.filter((item) => item.id !== message.commandId)
-      );
-    }, 5000);
+      setLastSlideCommandFeedback((current) => (current?.id === message.commandId ? null : current));
+    }, 3500);
 
     void forwardSlideCommandToReceiver(message);
   }, [forwardSlideCommandToReceiver]);
@@ -1773,53 +1773,47 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-          <span className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-            Slide Receiver
-          </span>
-          <input
-            value={slideReceiverHost}
-            onChange={(event) => setSlideReceiverHost(event.target.value)}
-            placeholder="mac-slides.local"
-            className="mstv-compact-control min-w-[220px] flex-1 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
-          />
-          <input
-            value={slideReceiverPort}
-            onChange={(event) => setSlideReceiverPort(event.target.value)}
-            placeholder="4317"
-            inputMode="numeric"
-            className="mstv-compact-control w-24 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
-          />
-          <span
-            className={`mstv-compact-control rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.18em] ${
-              slideReceiverStatus.state === "success"
-                ? "border-air/25 bg-air/10 text-air"
-                : slideReceiverStatus.state === "error" ||
-                    slideReceiverStatus.state === "not-configured"
-                  ? "border-tally/25 bg-tally/10 text-tally"
-                  : "border-white/10 bg-black/40 text-slate-400"
-            }`}
-          >
-            {slideReceiverStatus.state === "idle"
-              ? slideReceiverHost.trim()
-                ? "Receiver configuré"
-                : "Receiver non configuré"
-              : slideReceiverStatus.message}
-          </span>
-        </div>
-
-        {slideCommandFeedbacks.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {slideCommandFeedbacks.map((feedback) => (
-              <div
-                key={feedback.id}
-                className="mstv-compact-control rounded-full border border-air/25 bg-air/10 px-4 py-2 text-xs font-medium text-air"
-              >
-                {feedback.label}
-              </div>
-            ))}
+        <details className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3">
+            <span
+              className={`mstv-compact-control rounded-full border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                slideReceiverCompactStatus === "connecté"
+                  ? "border-transparent bg-emerald-500 text-white"
+                  : slideReceiverCompactStatus === "erreur"
+                    ? "border-transparent bg-tally text-white"
+                    : "border-transparent bg-slate-600 text-white"
+              }`}
+            >
+              Slides : {slideReceiverCompactStatus}
+            </span>
+            {lastSlideCommandFeedback ? (
+              <span className="text-xs text-slate-400">{lastSlideCommandFeedback.label}</span>
+            ) : null}
+            <span className="ml-auto text-[11px] uppercase tracking-[0.18em] text-slate-500">
+              Réglages slides
+            </span>
+          </summary>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <input
+              value={slideReceiverHost}
+              onChange={(event) => setSlideReceiverHost(event.target.value)}
+              placeholder="mac-slides.local"
+              className="mstv-compact-control min-w-[220px] flex-1 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
+            />
+            <input
+              value={slideReceiverPort}
+              onChange={(event) => setSlideReceiverPort(event.target.value)}
+              placeholder="4317"
+              inputMode="numeric"
+              className="mstv-compact-control w-24 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
+            />
+            {slideReceiverStatus.state !== "idle" ? (
+              <span className="mstv-compact-control rounded-full border border-white/10 bg-black/40 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                {slideReceiverStatus.message}
+              </span>
+            ) : null}
           </div>
-        ) : null}
+        </details>
 
         <div className={controlTileGridClassName}>
           <StudioInputTile
