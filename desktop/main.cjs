@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, screen, session, shell, systemPreferences } = require("electron");
+const { app, BrowserWindow, clipboard, dialog, ipcMain, screen, session, shell, systemPreferences } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -50,8 +50,19 @@ function getDesktopRoom() {
   return process.env.MSTV_DESKTOP_ROOM || DEFAULT_ROOM;
 }
 
-function buildRouteUrl(route) {
-  const room = encodeURIComponent(getDesktopRoom());
+function sanitizeRoomSlug(value) {
+  const slug = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+
+  return slug || DEFAULT_ROOM;
+}
+
+function buildRouteUrl(route, roomSlug) {
+  const room = encodeURIComponent(sanitizeRoomSlug(roomSlug || getDesktopRoom()));
   return `${getBaseUrl()}/${route}/${room}`;
 }
 
@@ -455,7 +466,7 @@ async function createControlWindow() {
   });
 }
 
-async function createProgramWindow(displayId) {
+async function createProgramWindow(displayId, roomSlug) {
   if (programWindow && !programWindow.isDestroyed()) {
     log("Program window already open; focusing existing window");
     programWindow.show();
@@ -511,7 +522,7 @@ async function createProgramWindow(displayId) {
     programWindow?.show();
   });
 
-  await loadWindow(programWindow, "Program", buildRouteUrl("program"));
+  await loadWindow(programWindow, "Program", buildRouteUrl("program", roomSlug));
   programWindow.setBounds(bounds);
   programWindow.setFullScreen(true);
   programWindow.show();
@@ -646,7 +657,7 @@ function configureDesktopIpc() {
     programWindow: getProgramWindowState()
   }));
 
-  ipcMain.handle("mstv:toggle-program-window", async (_event, displayId) => {
+  ipcMain.handle("mstv:toggle-program-window", async (_event, displayId, roomSlug) => {
     if (programWindow && !programWindow.isDestroyed()) {
       closeProgramWindow();
       return {
@@ -655,12 +666,17 @@ function configureDesktopIpc() {
       };
     }
 
-    await createProgramWindow(displayId);
+    await createProgramWindow(displayId, roomSlug);
 
     return {
       displays: buildDisplayOptions(),
       programWindow: getProgramWindowState()
     };
+  });
+
+  ipcMain.handle("mstv:write-clipboard-text", (_event, text) => {
+    clipboard.writeText(String(text || ""));
+    return { ok: true };
   });
 
   ipcMain.handle("mstv:send-slide-command", async (_event, input) => {

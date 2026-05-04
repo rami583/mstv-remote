@@ -7,7 +7,7 @@ function normalizeBaseUrl(value: string | undefined) {
   const trimmed = value?.trim();
 
   if (!trimmed) {
-    return "http://localhost:3000";
+    return null;
   }
 
   return trimmed.replace(/\/+$/, "");

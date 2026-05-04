@@ -35,7 +35,7 @@ interface ControlRoomClientProps {
 }
 
 interface DesktopRuntimeConfig {
-  guestPublicBaseUrl: string;
+  guestPublicBaseUrl: string | null;
   desktopRoomSlug: string;
 }
 
@@ -58,7 +58,11 @@ declare global {
   interface Window {
     mstvDesktop?: {
       getProgramDisplays: () => Promise<DesktopProgramWindowResponse>;
-      toggleProgramWindow: (displayId?: number | string | null) => Promise<DesktopProgramWindowResponse>;
+      toggleProgramWindow: (
+        displayId?: number | string | null,
+        roomSlug?: string
+      ) => Promise<DesktopProgramWindowResponse>;
+      writeClipboardText?: (text: string) => Promise<{ ok: boolean }>;
       sendSlideCommand: (input: {
         host: string;
         port: string;
@@ -348,6 +352,17 @@ function StudioInputTile(input: {
 
 function areGuestListsEqual(left: string[], right: string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sanitizeSessionSlug(value: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+
+  return slug || "studio";
 }
 
 function formatDeviceLabel(
@@ -646,6 +661,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [selectedProgramDisplayId, setSelectedProgramDisplayId] = useState<number | null>(null);
   const [isProgramWindowOpen, setIsProgramWindowOpen] = useState(false);
   const [guestLinkCopied, setGuestLinkCopied] = useState(false);
+  const [sessionSlugDraft, setSessionSlugDraft] = useState(room || "studio");
   const [slideReceiverHost, setSlideReceiverHost] = useState("");
   const [slideReceiverPort, setSlideReceiverPort] = useState("4317");
   const [slideReceiverStatus, setSlideReceiverStatus] = useState<SlideReceiverStatus>({
@@ -1027,6 +1043,10 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }, [refreshMediaDevices]);
 
   useEffect(() => {
+    setSessionSlugDraft(room || "studio");
+  }, [room]);
+
+  useEffect(() => {
     let active = true;
 
     async function loadDesktopConfig() {
@@ -1178,9 +1198,17 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     REGIE: getStudioInputStatus("REGIE"),
     IMAGE: getStudioInputStatus("IMAGE")
   };
+  const sanitizedSessionSlug = sanitizeSessionSlug(sessionSlugDraft);
+  const sessionSlugNeedsSanitizing = sessionSlugDraft.trim() !== sanitizedSessionSlug;
   const guestPublicLink = desktopConfig
-    ? `${desktopConfig.guestPublicBaseUrl.replace(/\/+$/, "")}/guest/${encodeURIComponent(room)}`
+    ? desktopConfig.guestPublicBaseUrl
+      ? `${desktopConfig.guestPublicBaseUrl.replace(/\/+$/, "")}/guest/${encodeURIComponent(room)}`
+      : null
     : null;
+  const guestPublicLinkWarning =
+    desktopConfig && !desktopConfig.guestPublicBaseUrl
+      ? "GUEST_PUBLIC_BASE_URL manquant dans .env.local"
+      : null;
   const slideReceiverCompactStatus = slideReceiverHost.trim()
     ? slideReceiverStatus.state === "error" || slideReceiverStatus.state === "not-configured"
       ? "erreur"
@@ -1642,12 +1670,56 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     }
 
     try {
-      await navigator.clipboard.writeText(guestPublicLink);
+      try {
+        await navigator.clipboard.writeText(guestPublicLink);
+      } catch (browserClipboardError) {
+        if (!window.mstvDesktop?.writeClipboardText) {
+          throw browserClipboardError;
+        }
+
+        await window.mstvDesktop.writeClipboardText(guestPublicLink);
+      }
       setGuestLinkCopied(true);
       window.setTimeout(() => setGuestLinkCopied(false), 1600);
     } catch {
       setError("Impossible de copier le lien invité.");
     }
+  }
+
+  async function handleApplySessionSlug() {
+    const nextRoom = sanitizedSessionSlug;
+
+    if (nextRoom === room) {
+      setSessionSlugDraft(nextRoom);
+      return;
+    }
+
+    if (
+      isProgramWindowOpen &&
+      !window.confirm(
+        "La sortie Program est ouverte. Elle va être fermée avant de changer de session."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      if (isProgramWindowOpen && window.mstvDesktop) {
+        const response = await window.mstvDesktop.toggleProgramWindow(selectedProgramDisplayId, room);
+
+        setProgramDisplays(response.displays);
+        setIsProgramWindowOpen(response.programWindow.isOpen);
+      }
+    } catch (programWindowError) {
+      setError(
+        programWindowError instanceof Error
+          ? programWindowError.message
+          : "Impossible de fermer la sortie Program."
+      );
+      return;
+    }
+
+    window.location.assign(`/control/${encodeURIComponent(nextRoom)}`);
   }
 
   async function handleToggleProgramWindow() {
@@ -1656,7 +1728,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     }
 
     try {
-      const response = await window.mstvDesktop.toggleProgramWindow(selectedProgramDisplayId);
+      const response = await window.mstvDesktop.toggleProgramWindow(selectedProgramDisplayId, room);
 
       setProgramDisplays(response.displays);
       setIsProgramWindowOpen(response.programWindow.isOpen);
@@ -1690,20 +1762,44 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           </div>
         ) : null}
 
-        {guestPublicLink ? (
+        {desktopConfig ? (
           <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
             <span className="mstv-ui-label">
               Lien invité
             </span>
             <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-200">
-              {guestPublicLink}
+              {guestPublicLink ?? guestPublicLinkWarning}
             </span>
+            <label className="mstv-ui-field min-w-[260px] gap-3 border border-white/10 bg-black">
+              <span className="mstv-ui-label">Session</span>
+              <input
+                value={sessionSlugDraft}
+                onChange={(event) => setSessionSlugDraft(event.target.value)}
+                placeholder="studio"
+                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-600"
+              />
+            </label>
+            {sessionSlugNeedsSanitizing ? (
+              <span className="text-xs text-slate-500">
+                Suggestion : {sanitizedSessionSlug}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                void handleApplySessionSlug();
+              }}
+              className="mstv-ui-button border border-white/10 bg-white/10 text-white transition hover:bg-white/15"
+            >
+              Appliquer
+            </button>
             <button
               type="button"
               onClick={() => {
                 void handleCopyGuestLink();
               }}
-              className="mstv-ui-button border border-white/10 bg-white/10 text-white transition hover:bg-white/15"
+              disabled={!guestPublicLink}
+              className="mstv-ui-button border border-white/10 bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {guestLinkCopied ? "Copié" : "Copier"}
             </button>
