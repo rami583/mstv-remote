@@ -1,8 +1,26 @@
+# Node
 node_modules/
+
+# Next.js
 .next/
+
+# Build
 dist/
 dist-slides/
+
+# Local tools
 .local/
-.env.local
+.npm/
+
+# macOS
 .DS_Store
+Library/
+
+# Logs
 *.log
+
+# Env
+.env.local
+
+# Typescript
+tsconfig.tsbuildinfo
