@@ -687,7 +687,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               <button
                 type="button"
                 onClick={() => handleSlideCommand("NEXT_SLIDE")}
-                className="rounded-full border border-air/30 bg-air/10 px-5 py-2.5 text-sm font-medium text-air transition hover:bg-air/15"
+                className="rounded-full border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/15"
               >
                 Suivant →
               </button>
