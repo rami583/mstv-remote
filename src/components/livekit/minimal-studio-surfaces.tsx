@@ -1346,7 +1346,7 @@ function ControlGuestGridContent({
         return (
           <div
             key={guest.participantId}
-            className={`group overflow-hidden rounded-[24px] border text-left transition ${
+            className={`mstv-source-tile group overflow-hidden rounded-[24px] border text-left transition ${
               guest.inProgram
                 ? "border-air/40 bg-white/[0.06]"
                 : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"

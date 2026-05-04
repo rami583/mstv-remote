@@ -50,3 +50,104 @@ a {
   background: var(--panel-strong);
   backdrop-filter: blur(18px);
 }
+
+.mstv-desktop-control {
+  font-size: 1.3rem;
+}
+
+.mstv-desktop-control .max-w-\[1680px\] {
+  max-width: 1617px;
+}
+
+.mstv-desktop-control .gap-1\.5 {
+  gap: 0.4875rem;
+}
+
+.mstv-desktop-control .gap-2 {
+  gap: 0.65rem;
+}
+
+.mstv-desktop-control .gap-3 {
+  gap: 0.975rem;
+}
+
+.mstv-desktop-control .gap-4 {
+  gap: 1rem;
+}
+
+.mstv-desktop-control .px-2\.5 {
+  padding-left: 0.8125rem;
+  padding-right: 0.8125rem;
+}
+
+.mstv-desktop-control .px-3 {
+  padding-left: 0.975rem;
+  padding-right: 0.975rem;
+}
+
+.mstv-desktop-control .px-3\.5 {
+  padding-left: 1.1375rem;
+  padding-right: 1.1375rem;
+}
+
+.mstv-desktop-control .px-4 {
+  padding-left: 1.3rem;
+  padding-right: 1.3rem;
+}
+
+.mstv-desktop-control .py-1 {
+  padding-top: 0.325rem;
+  padding-bottom: 0.325rem;
+}
+
+.mstv-desktop-control .py-1\.5 {
+  padding-top: 0.4875rem;
+  padding-bottom: 0.4875rem;
+}
+
+.mstv-desktop-control .py-2 {
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+}
+
+.mstv-desktop-control .py-3 {
+  padding-top: 0.975rem;
+  padding-bottom: 0.975rem;
+}
+
+.mstv-desktop-control .p-4 {
+  padding: 1.3rem;
+}
+
+.mstv-desktop-control .text-\[10px\] {
+  font-size: 13px;
+  line-height: 1.1rem;
+}
+
+.mstv-desktop-control .text-\[11px\] {
+  font-size: 14px;
+  line-height: 1.2rem;
+}
+
+.mstv-desktop-control .text-xs {
+  font-size: 0.975rem;
+  line-height: 1.35rem;
+}
+
+.mstv-desktop-control .text-sm {
+  font-size: 1.1375rem;
+  line-height: 1.6rem;
+}
+
+.mstv-desktop-control .text-base {
+  font-size: 1.3rem;
+  line-height: 1.75rem;
+}
+
+.mstv-desktop-control .rounded-\[18px\] {
+  border-radius: 23px;
+}
+
+.mstv-desktop-control .mstv-source-tile.rounded-\[24px\] {
+  border-radius: 31px;
+}

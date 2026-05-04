@@ -221,7 +221,7 @@ function StudioInputTile(input: {
           input.onActivate();
         }
       }}
-      className={`overflow-hidden rounded-[24px] border bg-white/[0.03] transition ${
+      className={`mstv-source-tile overflow-hidden rounded-[24px] border bg-white/[0.03] transition ${
         input.isActive
           ? "border-air/40 bg-white/[0.06]"
           : "border-tally/30 bg-white/[0.03] hover:border-tally/40 hover:bg-white/[0.05]"
@@ -1180,7 +1180,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     ? `${desktopConfig.guestPublicBaseUrl.replace(/\/+$/, "")}/guest/${encodeURIComponent(room)}`
     : null;
   const controlTileGridClassName = isDesktopRuntime
-    ? "grid grid-cols-3 gap-3"
+    ? "grid grid-cols-3 gap-4"
     : "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))]";
 
   const handlePresentGuestIdsChange = useCallback((nextGuestIds: string[]) => {
@@ -1664,7 +1664,11 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }
 
   return (
-    <main className="min-h-screen bg-black px-4 py-4 text-white md:px-6 md:py-6">
+    <main
+      className={`min-h-screen bg-black px-4 py-4 text-white md:px-6 md:py-6 ${
+        isDesktopRuntime ? "mstv-desktop-control" : ""
+      }`}
+    >
       <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4">
         {error ? (
           <div className="rounded-[18px] border border-tally/30 bg-tally/10 px-4 py-3 text-sm text-tally">
