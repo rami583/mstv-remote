@@ -1614,10 +1614,16 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }
 
   function getStudioInputStatus(inputId: ReturnSource) {
+    const activeToneClassNames: Record<ReturnSource, string> = {
+      STUDIO: "border-transparent bg-emerald-500 text-white",
+      REGIE: "border-transparent bg-amber-500 text-white",
+      IMAGE: "border-transparent bg-sky-500 text-white"
+    };
+
     return {
       toneClassName:
         inputId === visuallyActiveReturnSource
-          ? "border-transparent bg-emerald-500 text-white"
+          ? activeToneClassNames[inputId]
           : "border-transparent bg-tally text-white"
     };
   }
