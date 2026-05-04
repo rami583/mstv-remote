@@ -1333,7 +1333,7 @@ function ControlGuestGridContent({
         const sourcePillClassNames: Record<ReturnSource, string> = {
           STUDIO: "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
           REGIE: "border-transparent bg-amber-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
-          IMAGE: "border-transparent bg-slate-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+          IMAGE: "border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
         };
         const toggleProgramSelection = () => {
           if (selectionLimitReached) {
