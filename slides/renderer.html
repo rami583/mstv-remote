@@ -10,6 +10,7 @@
         --bg: #04101c;
         --bg-soft: #0c1b2d;
         --panel: rgba(8, 18, 31, 0.82);
+        --panel-strong: rgba(12, 28, 48, 0.94);
         --line: rgba(141, 240, 204, 0.18);
         --text: #edf4ff;
         --muted: #9fb2ca;
@@ -48,10 +49,16 @@
         overflow: hidden;
       }
 
-      body {
+      html {
         background:
           radial-gradient(circle at top left, rgba(247, 181, 0, 0.16), transparent 28%),
           radial-gradient(circle at bottom right, rgba(141, 240, 204, 0.12), transparent 32%),
+          var(--bg);
+      }
+
+      body {
+        color: var(--text);
+        background:
           linear-gradient(135deg, rgba(3, 9, 17, 0.92), rgba(7, 17, 31, 0.98)),
           var(--bg);
       }
@@ -79,8 +86,8 @@
         background: var(--panel);
         padding: 18px;
         text-align: center;
-        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.36);
-        backdrop-filter: blur(18px);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(16px);
       }
 
       h1 {

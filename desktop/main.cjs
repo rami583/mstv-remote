@@ -1,4 +1,4 @@
-const { app, BrowserWindow, clipboard, dialog, ipcMain, screen, session, shell, systemPreferences } = require("electron");
+const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, screen, session, shell, systemPreferences } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -202,6 +202,27 @@ function loadDesktopEnvironment() {
     desktopUrl: process.env.MSTV_DESKTOP_URL || null,
     port: getDesktopPort()
   });
+}
+
+function configureApplicationMenu() {
+  const appName = "MSTV Visio";
+
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: appName,
+        submenu: [
+          { role: "about", label: `À propos de ${appName}` },
+          { type: "separator" },
+          { role: "hide", label: `Masquer ${appName}` },
+          { role: "hideOthers", label: "Masquer les autres" },
+          { role: "unhide", label: "Tout afficher" },
+          { type: "separator" },
+          { role: "quit", label: `Quitter ${appName}` }
+        ]
+      }
+    ])
+  );
 }
 
 function waitForServer(url, timeoutMs = 30_000) {
@@ -805,6 +826,7 @@ app.name = "MSTV Visio";
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.whenReady().then(async () => {
+  configureApplicationMenu();
   configurePermissions();
   configureDesktopIpc();
   try {

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, systemPreferences } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, shell, systemPreferences } = require("electron");
 const { execFile } = require("node:child_process");
 const http = require("node:http");
 const os = require("node:os");
@@ -29,6 +29,27 @@ function getLocalAddresses() {
     .flat()
     .filter((networkInterface) => networkInterface && networkInterface.family === "IPv4" && !networkInterface.internal)
     .map((networkInterface) => networkInterface.address);
+}
+
+function configureApplicationMenu() {
+  const appName = "MSTV Click";
+
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: appName,
+        submenu: [
+          { role: "about", label: `À propos de ${appName}` },
+          { type: "separator" },
+          { role: "hide", label: `Masquer ${appName}` },
+          { role: "hideOthers", label: "Masquer les autres" },
+          { role: "unhide", label: "Tout afficher" },
+          { type: "separator" },
+          { role: "quit", label: `Quitter ${appName}` }
+        ]
+      }
+    ])
+  );
 }
 
 function isAccessibilityTrusted(prompt = false) {
@@ -443,6 +464,7 @@ function createWindow() {
 app.name = "MSTV Click";
 
 app.whenReady().then(() => {
+  configureApplicationMenu();
   ipcMain.handle("slides:get-state", () => ({
     ...serverState,
     localAddresses: getLocalAddresses(),
