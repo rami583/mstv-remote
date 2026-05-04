@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MSTV Slides Receiver</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #050505;
+        color: #f8fafc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at 50% 12%, rgba(148, 163, 184, 0.18), transparent 30%),
+          linear-gradient(145deg, #030303 0%, #111827 100%);
+      }
+
+      main {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: 10px;
+      }
+
+      .card {
+        display: flex;
+        max-height: 100%;
+        width: 100%;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 22px;
+        background: rgba(0, 0, 0, 0.62);
+        padding: 18px 16px;
+        text-align: center;
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.36);
+        backdrop-filter: blur(18px);
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        max-width: 100%;
+        font-size: 34px;
+        line-height: 0.96;
+        letter-spacing: -0.04em;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        max-width: 100%;
+        padding: 10px 16px;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+
+      .dot {
+        display: block;
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        box-shadow: 0 0 24px currentColor;
+      }
+
+      .connected {
+        border-color: rgba(34, 197, 94, 0.34);
+        background: rgba(34, 197, 94, 0.12);
+        color: #86efac;
+      }
+
+      .waiting {
+        border-color: rgba(251, 191, 36, 0.34);
+        background: rgba(251, 191, 36, 0.12);
+        color: #fde68a;
+      }
+
+      .disconnected {
+        border-color: rgba(248, 113, 113, 0.38);
+        background: rgba(248, 113, 113, 0.13);
+        color: #fca5a5;
+      }
+
+      .details {
+        margin-top: 12px;
+        max-width: 100%;
+      }
+
+      button {
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        padding: 10px 14px;
+        color: white;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .problem {
+        margin: 8px auto 0;
+        max-width: 280px;
+        color: #fca5a5;
+        font-size: 12px;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="card">
+        <h1>MSTV Slides</h1>
+
+        <div id="status" class="status disconnected">
+          <span id="status-dot" class="dot"></span>
+          <span id="status-text">NON DISPONIBLE</span>
+        </div>
+
+        <div id="details" class="details" hidden>
+          <button id="settings-button" type="button">Ouvrir les réglages</button>
+          <p id="problem" class="problem"></p>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const statusElement = document.getElementById("status");
+      const statusText = document.getElementById("status-text");
+      const detailsElement = document.getElementById("details");
+      const settingsButton = document.getElementById("settings-button");
+      const problemElement = document.getElementById("problem");
+
+      function renderState(state) {
+        const connectionState = state.connectionState || (state.running ? "waiting" : "unavailable");
+        const connected = connectionState === "connected";
+        const waiting = connectionState === "waiting";
+        const unavailable = connectionState === "unavailable";
+
+        statusElement.className = `status ${
+          connected ? "connected" : waiting ? "waiting" : "disconnected"
+        }`;
+        statusText.textContent = connected ? "CONNECTÉ" : waiting ? "EN ATTENTE" : "NON DISPONIBLE";
+        detailsElement.hidden = true;
+
+        if (unavailable) {
+          detailsElement.hidden = false;
+          problemElement.textContent = state.lastError || "Le serveur local n’est pas disponible.";
+          return;
+        }
+
+        if (state.lastError && /accessibility|not authorized|not permitted|System Events/i.test(state.lastError)) {
+          detailsElement.hidden = false;
+          problemElement.textContent = "Autorisez l’accès Accessibilité";
+          return;
+        }
+
+        problemElement.textContent = "";
+      }
+
+      settingsButton.addEventListener("click", async () => {
+        await window.mstvSlides.requestAccessibility();
+        await window.mstvSlides.openAccessibilitySettings();
+        renderState(await window.mstvSlides.getState());
+      });
+
+      window.mstvSlides.onState(renderState);
+      window.mstvSlides.getState().then(renderState);
+    </script>
+  </body>
+</html>

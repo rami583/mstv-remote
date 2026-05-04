@@ -1,0 +1,8 @@
+node_modules/
+.next/
+dist/
+dist-slides/
+.local/
+.env.local
+.DS_Store
+*.log

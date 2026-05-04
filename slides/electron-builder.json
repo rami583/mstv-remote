@@ -1,0 +1,27 @@
+{
+  "appId": "tv.monstudio.mstvslidesreceiver",
+  "productName": "MSTV Slides Receiver",
+  "directories": {
+    "output": "dist-slides"
+  },
+  "files": [
+    "slides/main.cjs",
+    "slides/preload.cjs",
+    "slides/renderer.html",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "main": "slides/main.cjs",
+    "name": "mstv-slides-receiver"
+  },
+  "mac": {
+    "category": "public.app-category.productivity",
+    "target": "dir",
+    "hardenedRuntime": true,
+    "entitlements": "slides/entitlements.mac.plist",
+    "entitlementsInherit": "slides/entitlements.mac.plist",
+    "extendInfo": {
+      "NSAppleEventsUsageDescription": "MSTV Slides Receiver envoie les touches flèche gauche/droite à l’application de présentation active."
+    }
+  }
+}

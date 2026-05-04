@@ -1,0 +1,83 @@
+{
+  "name": "visio-mstv",
+  "version": "0.1.0",
+  "private": true,
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "desktop:dev": "node desktop/scripts/dev.mjs",
+    "desktop:build": "npm run build && node desktop/scripts/prepare-next-standalone.mjs && electron-builder --mac dir",
+    "desktop:open": "node desktop/scripts/open-built-app.mjs",
+    "slides:dev": "node slides/scripts/dev.mjs",
+    "slides:build": "electron-builder --config slides/electron-builder.json --mac dir",
+    "slides:open": "node slides/scripts/open-built-app.mjs",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@livekit/components-react": "^2.7.6",
+    "clsx": "^2.1.1",
+    "livekit-client": "^2.11.3",
+    "livekit-server-sdk": "^2.9.7",
+    "next": "15.5.15",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@next/swc-wasm-nodejs": "15.5.15",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.4.20",
+    "electron": "^41.5.0",
+    "electron-builder": "^26.8.1",
+    "postcss": "^8.4.49",
+    "puppeteer-core": "^24.42.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "tv.monstudio.mstvremote",
+    "productName": "MSTV Remote",
+    "afterPack": "desktop/scripts/after-pack.cjs",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "desktop/main.cjs",
+      "desktop/preload.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "next-standalone",
+        "filter": [
+          "**/*",
+          "!node_modules/**"
+        ]
+      },
+      {
+        "from": ".next/standalone/node_modules",
+        "to": "next-standalone/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "target": "dir",
+      "hardenedRuntime": true,
+      "entitlements": "desktop/entitlements.mac.plist",
+      "entitlementsInherit": "desktop/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "MSTV Remote utilise la caméra pour publier les entrées vidéo de régie.",
+        "NSMicrophoneUsageDescription": "MSTV Remote utilise le micro pour publier les entrées audio de régie."
+      }
+    }
+  }
+}
