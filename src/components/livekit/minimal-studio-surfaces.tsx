@@ -1336,7 +1336,7 @@ function ControlGuestGridContent({
           IMAGE: "border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
         };
         const pillBaseClassName =
-          "mstv-compact-control-sm rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.16em]";
+          "mstv-ui-pill border";
         const neutralPillClassName =
           "border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-slate-500";
         const toggleProgramSelection = () => {
@@ -1405,7 +1405,7 @@ function ControlGuestGridContent({
               </div>
 
               {guest.selectionOrder ? (
-                <div className="pointer-events-none absolute right-4 top-4 z-20 rounded-full border border-transparent bg-emerald-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.24em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
+                <div className="mstv-ui-badge pointer-events-none absolute right-4 top-4 z-20 border border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
                   {guest.selectionOrder}
                 </div>
               ) : null}

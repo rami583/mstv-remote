@@ -259,7 +259,7 @@ function StudioInputTile(input: {
 
         <div className="absolute left-4 top-4 flex flex-wrap gap-2">
           <div
-            className={`rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] shadow-[0_2px_10px_rgba(0,0,0,0.35)] ${input.statusToneClassName}`}
+            className={`mstv-ui-badge border shadow-[0_2px_10px_rgba(0,0,0,0.35)] ${input.statusToneClassName}`}
           >
             {input.label}
           </div>
@@ -272,10 +272,10 @@ function StudioInputTile(input: {
         >
           {isImageTile ? (
             <label
-              className="flex cursor-pointer items-center gap-3 rounded-full border border-white/10 bg-black/80 px-4 py-2"
+              className="mstv-ui-field w-full cursor-pointer gap-3 border border-white/10 bg-black/80"
               onClick={(event) => event.stopPropagation()}
             >
-              <span className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Image</span>
+              <span className="mstv-ui-label">Image</span>
               <span className="min-w-0 flex-1 truncate text-sm text-white">
                 {input.imageFileName ?? "Select image"}
               </span>
@@ -294,10 +294,10 @@ function StudioInputTile(input: {
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               <label
-                className="flex items-center gap-3 rounded-full border border-white/10 bg-black/80 px-4 py-2"
+                className="mstv-ui-field gap-3 border border-white/10 bg-black/80"
                 onClick={(event) => event.stopPropagation()}
               >
-                <span className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Video Input</span>
+                <span className="mstv-ui-label">Video Input</span>
                 <select
                   value={input.selectedVideoInputId ?? ""}
                   onClick={(event) => event.stopPropagation()}
@@ -317,10 +317,10 @@ function StudioInputTile(input: {
               </label>
 
               <label
-                className="flex items-center gap-3 rounded-full border border-white/10 bg-black/80 px-4 py-2"
+                className="mstv-ui-field gap-3 border border-white/10 bg-black/80"
                 onClick={(event) => event.stopPropagation()}
               >
-                <span className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Audio Input</span>
+                <span className="mstv-ui-label">Audio Input</span>
                 <select
                   value={input.selectedAudioInputId ?? ""}
                   onClick={(event) => event.stopPropagation()}
@@ -1679,7 +1679,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
   return (
     <main
-      className={`min-h-screen bg-black px-4 py-4 text-white md:px-6 md:py-6 ${
+      className={`mstv-control min-h-screen bg-black px-4 py-4 text-white md:px-6 md:py-6 ${
         isDesktopRuntime ? "mstv-desktop-control" : ""
       }`}
     >
@@ -1692,7 +1692,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
         {guestPublicLink ? (
           <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-            <span className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+            <span className="mstv-ui-label">
               Lien invité
             </span>
             <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-200">
@@ -1703,7 +1703,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               onClick={() => {
                 void handleCopyGuestLink();
               }}
-              className="mstv-compact-control rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[11px] uppercase tracking-[0.2em] text-white transition hover:bg-white/15"
+              className="mstv-ui-button border border-white/10 bg-white/10 text-white transition hover:bg-white/15"
             >
               {guestLinkCopied ? "Copié" : "Copier"}
             </button>
@@ -1712,8 +1712,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
         {isDesktopRuntime ? (
           <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-            <label className="flex w-[320px] max-w-full items-center gap-3 rounded-full border border-white/10 bg-black px-4 py-2">
-              <span className="shrink-0 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+            <label className="mstv-ui-field w-[320px] max-w-full gap-3 border border-white/10 bg-black">
+              <span className="mstv-ui-label shrink-0">
                 Video Program
               </span>
               <select
@@ -1731,8 +1731,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
                 ))}
               </select>
             </label>
-            <label className="flex w-[320px] max-w-full items-center gap-3 rounded-full border border-white/10 bg-black px-4 py-2">
-              <span className="shrink-0 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+            <label className="mstv-ui-field w-[320px] max-w-full gap-3 border border-white/10 bg-black">
+              <span className="mstv-ui-label shrink-0">
                 Audio Program
               </span>
               <select
@@ -1758,7 +1758,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               onClick={() => {
                 void handleToggleProgramWindow();
               }}
-              className={`mstv-compact-control ml-auto rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition ${
+              className={`mstv-ui-button ml-auto border transition ${
                 isProgramWindowOpen
                   ? "border-air/30 bg-air/10 text-air hover:bg-air/15"
                   : "border-white/10 bg-white/10 text-slate-300 hover:border-white/20 hover:text-white"
@@ -1769,13 +1769,13 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-            <span className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+            <span className="mstv-ui-label">
               Audio Program
             </span>
             <select
               value={programAudioOutputDeviceId}
               onChange={(event) => setProgramAudioOutputDeviceId(event.target.value)}
-              className="min-w-[260px] rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none"
+              className="mstv-ui-field min-w-[260px] border border-white/10 bg-black text-white outline-none"
             >
               <option value="">Sortie système</option>
               {audioOutputs.map((device) => (
@@ -1789,14 +1789,14 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
         <details className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
           <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3">
-            <span className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+            <span className="mstv-ui-label">
               Réglages slides
             </span>
             {lastSlideCommandFeedback ? (
               <span className="text-xs text-slate-400">{lastSlideCommandFeedback.label}</span>
             ) : null}
             <span
-              className={`mstv-compact-control ml-auto rounded-full border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+              className={`mstv-ui-badge ml-auto border ${
                 slideReceiverCompactStatus === "connecté"
                   ? "border-transparent bg-emerald-500 text-white"
                   : slideReceiverCompactStatus === "erreur"
@@ -1812,17 +1812,17 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               value={slideReceiverHost}
               onChange={(event) => setSlideReceiverHost(event.target.value)}
               placeholder="mac-slides.local"
-              className="mstv-compact-control min-w-[220px] flex-1 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
+              className="mstv-ui-field min-w-[220px] flex-1 border border-white/10 bg-black text-white outline-none placeholder:text-slate-600"
             />
             <input
               value={slideReceiverPort}
               onChange={(event) => setSlideReceiverPort(event.target.value)}
               placeholder="4317"
               inputMode="numeric"
-              className="mstv-compact-control w-24 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
+              className="mstv-ui-field w-24 border border-white/10 bg-black text-white outline-none placeholder:text-slate-600"
             />
             {slideReceiverStatus.state !== "idle" ? (
-              <span className="mstv-compact-control rounded-full border border-white/10 bg-black/40 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+              <span className="mstv-ui-badge border border-white/10 bg-black/40 text-slate-400">
                 {slideReceiverStatus.message}
               </span>
             ) : null}
