@@ -1689,7 +1689,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               onClick={() => {
                 void handleCopyGuestLink();
               }}
-              className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[11px] uppercase tracking-[0.2em] text-white transition hover:bg-white/15"
+              className="mstv-compact-control rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[11px] uppercase tracking-[0.2em] text-white transition hover:bg-white/15"
             >
               {guestLinkCopied ? "Copié" : "Copier"}
             </button>
@@ -1744,7 +1744,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               onClick={() => {
                 void handleToggleProgramWindow();
               }}
-              className={`ml-auto rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition ${
+              className={`mstv-compact-control ml-auto rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition ${
                 isProgramWindowOpen
                   ? "border-air/30 bg-air/10 text-air hover:bg-air/15"
                   : "border-white/10 bg-white/10 text-slate-300 hover:border-white/20 hover:text-white"
@@ -1781,17 +1781,17 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             value={slideReceiverHost}
             onChange={(event) => setSlideReceiverHost(event.target.value)}
             placeholder="mac-slides.local"
-            className="min-w-[220px] flex-1 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
+            className="mstv-compact-control min-w-[220px] flex-1 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
           />
           <input
             value={slideReceiverPort}
             onChange={(event) => setSlideReceiverPort(event.target.value)}
             placeholder="4317"
             inputMode="numeric"
-            className="w-24 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
+            className="mstv-compact-control w-24 rounded-full border border-white/10 bg-black px-4 py-2 text-sm text-white outline-none placeholder:text-slate-600"
           />
           <span
-            className={`rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.18em] ${
+            className={`mstv-compact-control rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.18em] ${
               slideReceiverStatus.state === "success"
                 ? "border-air/25 bg-air/10 text-air"
                 : slideReceiverStatus.state === "error" ||
@@ -1813,7 +1813,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             {slideCommandFeedbacks.map((feedback) => (
               <div
                 key={feedback.id}
-                className="rounded-full border border-air/25 bg-air/10 px-4 py-2 text-xs font-medium text-air"
+                className="mstv-compact-control rounded-full border border-air/25 bg-air/10 px-4 py-2 text-xs font-medium text-air"
               >
                 {feedback.label}
               </div>

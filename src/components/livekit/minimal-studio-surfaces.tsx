@@ -1428,7 +1428,7 @@ function ControlGuestGridContent({
                             event.stopPropagation();
                             onSelectGuestReturnSource?.(guest.participantId, source);
                           }}
-                          className={`rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition ${
+                          className={`mstv-compact-control-sm rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition ${
                             isActive
                               ? sourcePillClassNames[source]
                               : "border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-slate-500"
@@ -1446,7 +1446,7 @@ function ControlGuestGridContent({
                         event.stopPropagation();
                         onToggleGuestSlideControl?.(guest.participantId);
                       }}
-                      className={`rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition ${
+                      className={`mstv-compact-control-sm rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition ${
                         guest.slideControlEnabled
                           ? "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
                           : "border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-slate-500"
@@ -1469,7 +1469,7 @@ function ControlGuestGridContent({
                         }
                         onDisconnectGuest?.(guest.participantId);
                       }}
-                      className={`rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition ${
+                      className={`mstv-compact-control-sm rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition ${
                         guest.disconnectControlDisabled
                           ? "cursor-default opacity-40"
                           : "hover:border-white/20 hover:text-white"

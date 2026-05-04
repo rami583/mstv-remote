@@ -151,3 +151,16 @@ a {
 .mstv-desktop-control .mstv-source-tile.rounded-\[24px\] {
   border-radius: 31px;
 }
+
+.mstv-desktop-control button,
+.mstv-desktop-control .mstv-compact-control {
+  font-size: 0.82rem;
+  line-height: 1.05rem;
+  padding: 0.45rem 0.85rem;
+}
+
+.mstv-desktop-control .mstv-compact-control-sm {
+  font-size: 0.72rem;
+  line-height: 0.95rem;
+  padding: 0.35rem 0.7rem;
+}
