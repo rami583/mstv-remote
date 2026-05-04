@@ -160,6 +160,7 @@ function StudioInputTile(input: {
   previewStream: MediaStream | null;
   previewImageSrc?: string | null;
   statusToneClassName: string;
+  tileToneClassName: string;
   error: string | null;
   inputsEnabled: boolean;
   videoInputs: MediaDeviceOption[];
@@ -221,11 +222,7 @@ function StudioInputTile(input: {
           input.onActivate();
         }
       }}
-      className={`mstv-source-tile overflow-hidden rounded-[24px] border bg-white/[0.03] transition ${
-        input.isActive
-          ? "border-air/40 bg-white/[0.06]"
-          : "border-tally/30 bg-white/[0.03] hover:border-tally/40 hover:bg-white/[0.05]"
-      }`}
+      className={`mstv-source-tile overflow-hidden rounded-[24px] border bg-white/[0.03] transition ${input.tileToneClassName}`}
     >
       <div className="relative aspect-video bg-black">
         <video
@@ -1176,6 +1173,11 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     ]
   );
   const visuallyActiveReturnSource = singleEffectiveReturnSource ?? (guests.length === 0 ? globalReturnSource : null);
+  const studioInputStatuses = {
+    STUDIO: getStudioInputStatus("STUDIO"),
+    REGIE: getStudioInputStatus("REGIE"),
+    IMAGE: getStudioInputStatus("IMAGE")
+  };
   const guestPublicLink = desktopConfig
     ? `${desktopConfig.guestPublicBaseUrl.replace(/\/+$/, "")}/guest/${encodeURIComponent(room)}`
     : null;
@@ -1619,12 +1621,18 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       REGIE: "border-transparent bg-amber-500 text-white",
       IMAGE: "border-transparent bg-sky-500 text-white"
     };
+    const activeTileClassNames: Record<ReturnSource, string> = {
+      STUDIO: "border-emerald-500/60 bg-white/[0.06]",
+      REGIE: "border-amber-500/60 bg-white/[0.06]",
+      IMAGE: "border-sky-500/60 bg-white/[0.06]"
+    };
+    const isActive = inputId === visuallyActiveReturnSource;
 
     return {
-      toneClassName:
-        inputId === visuallyActiveReturnSource
-          ? activeToneClassNames[inputId]
-          : "border-transparent bg-tally text-white"
+      toneClassName: isActive ? activeToneClassNames[inputId] : "border-transparent bg-tally text-white",
+      tileToneClassName: isActive
+        ? activeTileClassNames[inputId]
+        : "border-tally/30 bg-white/[0.03] hover:border-tally/40 hover:bg-white/[0.05]"
     };
   }
 
@@ -1829,7 +1837,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               void handleSelectGlobalReturnSource("STUDIO");
             }}
             previewStream={returnPreviewStreams.STUDIO}
-            statusToneClassName={getStudioInputStatus("STUDIO").toneClassName}
+            statusToneClassName={studioInputStatuses.STUDIO.toneClassName}
+            tileToneClassName={studioInputStatuses.STUDIO.tileToneClassName}
             error={returnFeedPublisherStates.STUDIO.error}
             inputsEnabled={returnInputsEnabled}
             videoInputs={videoInputs}
@@ -1850,7 +1859,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               void handleSelectGlobalReturnSource("REGIE");
             }}
             previewStream={returnPreviewStreams.REGIE}
-            statusToneClassName={getStudioInputStatus("REGIE").toneClassName}
+            statusToneClassName={studioInputStatuses.REGIE.toneClassName}
+            tileToneClassName={studioInputStatuses.REGIE.tileToneClassName}
             error={returnFeedPublisherStates.REGIE.error}
             inputsEnabled={returnInputsEnabled}
             videoInputs={videoInputs}
@@ -1872,7 +1882,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             }}
             previewStream={null}
             previewImageSrc={studioInputs.IMAGE.imageDataUrl ?? null}
-            statusToneClassName={getStudioInputStatus("IMAGE").toneClassName}
+            statusToneClassName={studioInputStatuses.IMAGE.toneClassName}
+            tileToneClassName={studioInputStatuses.IMAGE.tileToneClassName}
             error={null}
             inputsEnabled={returnInputsEnabled}
             videoInputs={videoInputs}
