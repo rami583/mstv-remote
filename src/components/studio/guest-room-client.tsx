@@ -535,9 +535,9 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
             <div
               className="relative aspect-video overflow-hidden rounded-[14px] bg-black"
               style={{
-                maxHeight: "55svh",
-                maxWidth: "900px",
-                width: "min(900px, calc(55svh * 1.77778), 100%)"
+                maxHeight: "70svh",
+                maxWidth: "1120px",
+                width: "min(1120px, calc(70svh * 1.77778), 100%)"
               }}
             >
               {greenRoomStream ? <LocalStreamPreview stream={greenRoomStream} /> : null}
@@ -553,8 +553,8 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                 </div>
               ) : null}
             </div>
-            <div className="mx-auto flex w-full max-w-xs flex-col items-center gap-2 px-2 pt-2.5 text-center">
-              <p className="text-xs text-slate-200">Placez-vous correctement dans l’image.</p>
+            <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2.5 px-2 pt-3 text-center">
+              <p className="text-sm text-slate-200">Placez-vous correctement dans l’image.</p>
               <input
                 value={guestName}
                 onChange={(event) => {
@@ -564,13 +564,13 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                   }
                 }}
                 placeholder="Votre nom"
-                className="w-full rounded-md border border-white/10 bg-black px-3 py-2 text-xs text-slate-100 outline-none"
+                className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-slate-100 outline-none"
               />
               <button
                 type="button"
                 onClick={handleConfirmJoin}
                 disabled={isJoiningLive || isCheckingMediaAccess}
-                className="rounded-md border border-air/30 bg-air/10 px-4 py-2 text-xs font-medium text-air transition hover:bg-air/15 disabled:opacity-60"
+                className="rounded-lg border border-air/30 bg-air/10 px-5 py-2.5 text-sm font-medium text-air transition hover:bg-air/15 disabled:opacity-60"
               >
                 {isJoiningLive
                   ? "Connexion..."
@@ -595,8 +595,8 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
           className="relative aspect-video overflow-hidden rounded-[14px] bg-black"
           style={{
             maxHeight: "calc(100svh - 1rem)",
-            maxWidth: "1000px",
-            width: "min(1000px, calc((100svh - 1rem) * 1.77778), 100%)"
+            maxWidth: "1180px",
+            width: "min(1180px, calc((100svh - 1rem) * 1.77778), 100%)"
           }}
         >
           <GuestProgramReturnSurface
@@ -616,7 +616,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
             }}
           />
 
-          <div className="absolute bottom-2 right-2 w-[22%] min-w-[120px] max-w-[200px] overflow-hidden rounded-[10px] border border-white/15 bg-black md:bottom-3 md:right-3">
+          <div className="absolute bottom-2 right-2 w-[23%] min-w-[140px] max-w-[240px] overflow-hidden rounded-[12px] border border-white/15 bg-black md:bottom-3 md:right-3">
             <div className="relative aspect-video overflow-hidden bg-black">
               <GuestContributionSurface
                 session={contributionSession}
@@ -631,14 +631,14 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               />
               <LocalPreviewGuide />
 
-              <div className="absolute left-1.5 top-1.5 z-20 flex gap-1">
+              <div className="absolute left-2 top-2 z-20 flex gap-1.5">
                 <div
-                  className={`rounded-full border px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-[0.12em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
+                  className={`rounded-full border px-2 py-1 text-[9px] font-medium uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
                 >
                   Mic
                 </div>
                 <div
-                  className={`rounded-full border px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-[0.12em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
+                  className={`rounded-full border px-2 py-1 text-[9px] font-medium uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
                 >
                   Cam
                 </div>
