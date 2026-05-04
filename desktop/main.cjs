@@ -8,6 +8,13 @@ const DEFAULT_ROOM = "studio";
 const DEFAULT_PORT = 3100;
 const SERVER_HOST = "127.0.0.1";
 const REQUIRED_ENV_KEYS = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"];
+const DESKTOP_CONFIG_ENV_KEYS = [
+  "GUEST_PUBLIC_BASE_URL",
+  "MSTV_DESKTOP_ROOM",
+  "MSTV_DESKTOP_URL",
+  "MSTV_DESKTOP_PORT"
+];
+const KNOWN_ENV_KEYS = [...REQUIRED_ENV_KEYS, ...DESKTOP_CONFIG_ENV_KEYS];
 const CONTROL_TILE_WIDTH = 507;
 const CONTROL_TILE_GAP = 16;
 const CONTROL_PAGE_HORIZONTAL_PADDING = 64;
@@ -69,7 +76,12 @@ function buildRouteUrl(route, roomSlug) {
 function parseEnvFile(contents) {
   const values = {};
 
-  for (const line of contents.split(/\r?\n/)) {
+  const normalizedContents = contents.replace(
+    new RegExp(`([^\\r\\n])(${KNOWN_ENV_KEYS.join("|")}=)`, "g"),
+    "$1\n$2"
+  );
+
+  for (const line of normalizedContents.split(/\r?\n/)) {
     const trimmed = line.trim();
 
     if (!trimmed || trimmed.startsWith("#")) {
@@ -163,14 +175,18 @@ function loadDesktopEnvironment() {
 
     loadedFiles.push({
       path: envFilePath,
-      keys: loadedKeys
+      keys: loadedKeys,
+      parsedKeys: Object.keys(values),
+      guestPublicBaseUrlParsed: Boolean(values.GUEST_PUBLIC_BASE_URL)
     });
   }
 
   log("Desktop env file lookup", {
     found: loadedFiles.map((file) => ({
       path: file.path,
-      loadedKeys: file.keys
+      loadedKeys: file.keys,
+      parsedKeys: file.parsedKeys,
+      guestPublicBaseUrlParsed: file.guestPublicBaseUrlParsed
     })),
     missing: missingFiles
   });
@@ -181,7 +197,7 @@ function loadDesktopEnvironment() {
   });
   log("Desktop runtime config", {
     roomSlug: getDesktopRoom(),
-    publicGuestBaseUrl: process.env.GUEST_PUBLIC_BASE_URL || null,
+    publicGuestBaseUrlPresent: Boolean(process.env.GUEST_PUBLIC_BASE_URL),
     desktopUrl: process.env.MSTV_DESKTOP_URL || null,
     port: getDesktopPort()
   });
@@ -219,7 +235,11 @@ function startBundledNextServer() {
 
   const serverPath = path.join(process.resourcesPath, "next-standalone", "server.js");
   const port = getDesktopPort();
-  log("Starting bundled Next server", { serverPath, port });
+  log("Starting bundled Next server", {
+    serverPath,
+    port,
+    guestPublicBaseUrlPresent: Boolean(process.env.GUEST_PUBLIC_BASE_URL)
+  });
 
   nextServerProcess = spawn(process.execPath, [serverPath], {
     cwd: path.dirname(serverPath),

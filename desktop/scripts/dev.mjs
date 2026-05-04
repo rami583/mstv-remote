@@ -12,11 +12,24 @@ const baseUrl = `http://${host}:${port}`;
 const nextBin = path.join(projectRoot, "node_modules/next/dist/bin/next");
 const electronBin = path.join(projectRoot, "node_modules/.bin/electron");
 const envFilePath = path.join(projectRoot, ".env.local");
+const requiredKeys = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"];
+const desktopConfigKeys = [
+  "GUEST_PUBLIC_BASE_URL",
+  "MSTV_DESKTOP_ROOM",
+  "MSTV_DESKTOP_URL",
+  "MSTV_DESKTOP_PORT"
+];
+const knownEnvKeys = [...requiredKeys, ...desktopConfigKeys];
 
 function parseEnvFile(contents) {
   const values = {};
 
-  for (const line of contents.split(/\r?\n/)) {
+  const normalizedContents = contents.replace(
+    new RegExp(`([^\\r\\n])(${knownEnvKeys.join("|")}=)`, "g"),
+    "$1\n$2"
+  );
+
+  for (const line of normalizedContents.split(/\r?\n/)) {
     const trimmed = line.trim();
 
     if (!trimmed || trimmed.startsWith("#")) {
@@ -57,7 +70,6 @@ function loadDevEnvironment() {
   }
 
   const values = parseEnvFile(fs.readFileSync(envFilePath, "utf8"));
-  const requiredKeys = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"];
   const mergedEnv = { ...process.env };
 
   for (const [key, value] of Object.entries(values)) {
@@ -67,6 +79,10 @@ function loadDevEnvironment() {
   }
 
   console.log(`[desktop] loaded .env.local from ${envFilePath}`);
+  console.log(`[desktop] parsed env keys: ${Object.keys(values).join(", ") || "none"}`);
+  console.log(
+    `[desktop] GUEST_PUBLIC_BASE_URL present: ${Boolean(mergedEnv.GUEST_PUBLIC_BASE_URL)}`
+  );
   console.log(
     `[desktop] required env present: ${requiredKeys.filter((key) => Boolean(mergedEnv[key])).join(", ") || "none"}`
   );
