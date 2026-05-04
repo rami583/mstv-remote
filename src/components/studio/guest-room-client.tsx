@@ -529,25 +529,32 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
         : readinessMessage;
 
     return (
-      <main className="h-[100svh] overflow-hidden bg-black px-3 py-3 text-white md:px-4 md:py-4">
-        <div className="mx-auto flex h-full w-full max-w-[980px] items-center justify-center">
-          <div className="flex h-full w-full flex-col justify-center">
-            <div className="relative mx-auto aspect-video h-auto max-h-[60svh] w-full max-w-[960px] overflow-hidden rounded-[16px] bg-black md:rounded-[18px]">
+      <main className="h-[100svh] overflow-hidden bg-black px-2 py-2 text-white">
+        <div className="mx-auto flex h-full w-full items-center justify-center">
+          <div className="flex h-full w-full flex-col items-center justify-center">
+            <div
+              className="relative aspect-video overflow-hidden rounded-[14px] bg-black"
+              style={{
+                maxHeight: "55svh",
+                maxWidth: "900px",
+                width: "min(900px, calc(55svh * 1.77778), 100%)"
+              }}
+            >
               {greenRoomStream ? <LocalStreamPreview stream={greenRoomStream} /> : null}
               <LocalPreviewGuide />
               {previewMessage ? (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 px-4 text-center">
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 px-3 text-center">
                   <div>
-                    <p className="text-xs font-medium text-signal md:text-sm">{previewMessage}</p>
-                    <p className="mt-1.5 text-[11px] text-slate-300 md:text-xs">
+                    <p className="text-xs font-medium text-signal">{previewMessage}</p>
+                    <p className="mt-1 text-[10px] text-slate-300">
                       Cliquez sur l’icône caméra dans la barre d’adresse pour modifier les autorisations.
                     </p>
                   </div>
                 </div>
               ) : null}
             </div>
-            <div className="mx-auto flex max-w-sm flex-col items-center gap-2.5 px-3 pt-3 text-center md:gap-3">
-              <p className="text-sm text-slate-200 md:text-base">Placez-vous correctement dans l’image.</p>
+            <div className="mx-auto flex w-full max-w-xs flex-col items-center gap-2 px-2 pt-2.5 text-center">
+              <p className="text-xs text-slate-200">Placez-vous correctement dans l’image.</p>
               <input
                 value={guestName}
                 onChange={(event) => {
@@ -557,13 +564,13 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                   }
                 }}
                 placeholder="Votre nom"
-                className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-slate-100 outline-none"
+                className="w-full rounded-md border border-white/10 bg-black px-3 py-2 text-xs text-slate-100 outline-none"
               />
               <button
                 type="button"
                 onClick={handleConfirmJoin}
                 disabled={isJoiningLive || isCheckingMediaAccess}
-                className="rounded-lg border border-air/30 bg-air/10 px-5 py-2.5 text-xs font-medium text-air transition hover:bg-air/15 disabled:opacity-60 md:text-sm"
+                className="rounded-md border border-air/30 bg-air/10 px-4 py-2 text-xs font-medium text-air transition hover:bg-air/15 disabled:opacity-60"
               >
                 {isJoiningLive
                   ? "Connexion..."
@@ -583,8 +590,15 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
 
   return (
     <main className="h-[100svh] overflow-hidden bg-black text-white">
-      <div className="relative mx-auto flex h-full w-full items-center justify-center p-3 md:p-4">
-        <div className="relative aspect-video h-auto max-h-[calc(100svh-2rem)] w-full max-w-[1120px] overflow-hidden rounded-[16px] bg-black md:rounded-[18px]">
+      <div className="relative mx-auto flex h-full w-full items-center justify-center p-2">
+        <div
+          className="relative aspect-video overflow-hidden rounded-[14px] bg-black"
+          style={{
+            maxHeight: "calc(100svh - 1rem)",
+            maxWidth: "1000px",
+            width: "min(1000px, calc((100svh - 1rem) * 1.77778), 100%)"
+          }}
+        >
           <GuestProgramReturnSurface
             session={programSession}
             channel="program"
@@ -602,7 +616,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
             }}
           />
 
-          <div className="absolute bottom-2.5 right-2.5 w-[23%] min-w-[130px] max-w-[220px] overflow-hidden rounded-[12px] border border-white/15 bg-black md:bottom-4 md:right-4 md:rounded-[14px]">
+          <div className="absolute bottom-2 right-2 w-[22%] min-w-[120px] max-w-[200px] overflow-hidden rounded-[10px] border border-white/15 bg-black md:bottom-3 md:right-3">
             <div className="relative aspect-video overflow-hidden bg-black">
               <GuestContributionSurface
                 session={contributionSession}
@@ -617,14 +631,14 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               />
               <LocalPreviewGuide />
 
-              <div className="absolute left-1.5 top-1.5 z-20 flex gap-1.5 md:left-2 md:top-2">
+              <div className="absolute left-1.5 top-1.5 z-20 flex gap-1">
                 <div
-                  className={`rounded-full border px-1.5 py-1 text-[8px] font-medium uppercase tracking-[0.14em] md:px-2 md:text-[9px] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
+                  className={`rounded-full border px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-[0.12em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
                 >
                   Mic
                 </div>
                 <div
-                  className={`rounded-full border px-1.5 py-1 text-[8px] font-medium uppercase tracking-[0.14em] md:px-2 md:text-[9px] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
+                  className={`rounded-full border px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-[0.12em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
                 >
                   Cam
                 </div>
@@ -633,11 +647,11 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
           </div>
 
           {messages.length > 0 ? (
-            <div className="absolute bottom-2.5 left-2.5 max-w-[320px] space-y-1.5 md:bottom-4 md:left-4">
+            <div className="absolute bottom-2 left-2 max-w-[280px] space-y-1">
               {messages.slice(0, 3).map((message) => (
                 <div
                   key={message.id}
-                  className="rounded-lg border border-white/10 bg-black/75 px-3 py-2 text-xs text-slate-100 backdrop-blur"
+                  className="rounded-md border border-white/10 bg-black/75 px-2.5 py-1.5 text-[11px] text-slate-100 backdrop-blur"
                 >
                   {message.body}
                 </div>
@@ -646,11 +660,11 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
           ) : null}
 
           {slideControlAuthorized ? (
-            <div className="absolute left-2.5 top-2.5 z-20 flex gap-2 md:left-4 md:top-4">
+            <div className="absolute left-2 top-2 z-20 flex gap-1.5">
               <button
                 type="button"
                 onClick={() => handleSlideCommand("PREV_SLIDE")}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-lg text-white backdrop-blur transition hover:bg-white/10 md:h-10 md:w-10 md:text-xl"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/70 text-base text-white backdrop-blur transition hover:bg-white/10"
                 aria-label="Slide précédent"
               >
                 ←
@@ -658,7 +672,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               <button
                 type="button"
                 onClick={() => handleSlideCommand("NEXT_SLIDE")}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-lg text-white backdrop-blur transition hover:bg-white/10 md:h-10 md:w-10 md:text-xl"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/70 text-base text-white backdrop-blur transition hover:bg-white/10"
                 aria-label="Slide suivant"
               >
                 →
