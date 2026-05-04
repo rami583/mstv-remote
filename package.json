@@ -42,8 +42,8 @@
     "typescript": "^5.7.2"
   },
   "build": {
-    "appId": "tv.monstudio.mstvremote",
-    "productName": "MSTV Remote",
+    "appId": "tv.monstudio.mstvvisio",
+    "productName": "MSTV Visio",
     "afterPack": "desktop/scripts/after-pack.cjs",
     "directories": {
       "output": "dist"
@@ -77,8 +77,8 @@
       "entitlements": "desktop/entitlements.mac.plist",
       "entitlementsInherit": "desktop/entitlements.mac.plist",
       "extendInfo": {
-        "NSCameraUsageDescription": "MSTV Remote utilise la caméra pour publier les entrées vidéo de régie.",
-        "NSMicrophoneUsageDescription": "MSTV Remote utilise le micro pour publier les entrées audio de régie."
+        "NSCameraUsageDescription": "MSTV Visio utilise la caméra pour publier les entrées vidéo de régie.",
+        "NSMicrophoneUsageDescription": "MSTV Visio utilise le micro pour publier les entrées audio de régie."
       }
     }
   }

@@ -324,7 +324,7 @@ function createServer() {
       markRemoteContact();
       writeJson(response, 200, {
         ok: true,
-        app: "MSTV Slides Receiver",
+        app: "MSTV Click",
         running: serverState.running,
         connectionState: getConnectionState(),
         host: serverState.host,
@@ -424,7 +424,7 @@ function createWindow() {
     fullscreen: false,
     fullscreenable: false,
     center: true,
-    title: "MSTV Slides Receiver",
+    title: "MSTV Click",
     backgroundColor: "#0a0a0a",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -439,6 +439,8 @@ function createWindow() {
     emitState();
   });
 }
+
+app.name = "MSTV Click";
 
 app.whenReady().then(() => {
   ipcMain.handle("slides:get-state", () => ({

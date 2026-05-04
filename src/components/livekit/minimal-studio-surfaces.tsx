@@ -140,7 +140,7 @@ function buildRemoteParticipantStates(remoteParticipants: ReturnType<typeof useR
 function getMediaCaptureErrorMessage(error: unknown) {
   if (error instanceof DOMException) {
     if (error.name === "NotAllowedError" || error.name === "SecurityError") {
-      return "Autorisez MSTV Remote dans Réglages Système > Confidentialité et sécurité > Caméra / Microphone.";
+      return "Autorisez MSTV Visio dans Réglages Système > Confidentialité et sécurité > Caméra / Microphone.";
     }
 
     if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {

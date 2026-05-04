@@ -1,8 +1,8 @@
 const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 
-const CAMERA_MESSAGE = "MSTV Remote utilise la caméra pour publier les entrées vidéo de régie.";
-const MICROPHONE_MESSAGE = "MSTV Remote utilise le micro pour publier les entrées audio de régie.";
+const CAMERA_MESSAGE = "MSTV Visio utilise la caméra pour publier les entrées vidéo de régie.";
+const MICROPHONE_MESSAGE = "MSTV Visio utilise le micro pour publier les entrées audio de régie.";
 
 function setPlistValue(plistPath, key, value) {
   try {
@@ -25,15 +25,15 @@ exports.default = async function afterPack(context) {
   const appRoot = path.join(context.appOutDir, appName, "Contents");
   const plistPaths = [
     path.join(appRoot, "Info.plist"),
-    path.join(appRoot, "Frameworks", "MSTV Remote Helper.app", "Contents", "Info.plist"),
-    path.join(appRoot, "Frameworks", "MSTV Remote Helper (Renderer).app", "Contents", "Info.plist"),
-    path.join(appRoot, "Frameworks", "MSTV Remote Helper (GPU).app", "Contents", "Info.plist"),
-    path.join(appRoot, "Frameworks", "MSTV Remote Helper (Plugin).app", "Contents", "Info.plist")
+    path.join(appRoot, "Frameworks", "MSTV Visio Helper.app", "Contents", "Info.plist"),
+    path.join(appRoot, "Frameworks", "MSTV Visio Helper (Renderer).app", "Contents", "Info.plist"),
+    path.join(appRoot, "Frameworks", "MSTV Visio Helper (GPU).app", "Contents", "Info.plist"),
+    path.join(appRoot, "Frameworks", "MSTV Visio Helper (Plugin).app", "Contents", "Info.plist")
   ];
 
   for (const plistPath of plistPaths) {
     setPlistValue(plistPath, "NSCameraUsageDescription", CAMERA_MESSAGE);
     setPlistValue(plistPath, "NSMicrophoneUsageDescription", MICROPHONE_MESSAGE);
-    setPlistValue(plistPath, "CFBundleDisplayName", "MSTV Remote");
+    setPlistValue(plistPath, "CFBundleDisplayName", "MSTV Visio");
   }
 };

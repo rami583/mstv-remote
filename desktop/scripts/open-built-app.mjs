@@ -6,13 +6,13 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../..");
 const candidates = [
-  path.join(projectRoot, "dist", "mac-arm64", "MSTV Remote.app"),
-  path.join(projectRoot, "dist", "mac", "MSTV Remote.app")
+  path.join(projectRoot, "dist", "mac-arm64", "MSTV Visio.app"),
+  path.join(projectRoot, "dist", "mac", "MSTV Visio.app")
 ];
 const appPath = candidates.find((candidate) => fs.existsSync(candidate));
 
 if (!appPath) {
-  console.error("MSTV Remote.app was not found. Run npm run desktop:build first.");
+  console.error("MSTV Visio.app was not found. Run npm run desktop:build first.");
   process.exit(1);
 }
 

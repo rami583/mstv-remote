@@ -1,4 +1,4 @@
-# Visio MSTV
+# MSTV Visio
 
 Next.js scaffold for an asymmetrical studio contribution system built with TypeScript, Tailwind CSS, LiveKit, and Node.js token routes.
 

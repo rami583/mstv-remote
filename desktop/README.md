@@ -1,8 +1,8 @@
-# MSTV Remote Desktop
+# MSTV Visio Desktop
 
 ## Runtime Architecture
 
-The macOS app is the operator workstation for MSTV Remote. It opens only the
+The macOS app is the operator workstation for MSTV Visio. It opens only the
 native Control window and Program Output window, and in packaged mode it starts
 its own local Next server for those desktop surfaces.
 
@@ -81,14 +81,20 @@ For desktop development, place `.env.local` at the project root:
 For the packaged macOS app, use one of these options:
 
 ```bash
-~/Library/Application Support/MSTV Remote/.env.local
+~/Library/Application Support/MSTV Visio/.env.local
 ~/.mstv-remote/.env.local
+```
+
+For compatibility, MSTV Visio also checks the legacy MSTV Remote support path if it exists:
+
+```bash
+~/Library/Application Support/MSTV Remote/.env.local
 ```
 
 During local packaged testing from this repository, the app also searches parent folders above the `.app`, so the project-root `.env.local` is found when launching:
 
 ```bash
-/Users/rami/Desktop/Visio MSTV/dist/mac-arm64/MSTV Remote.app
+/Users/rami/Desktop/Visio MSTV/dist/mac-arm64/MSTV Visio.app
 ```
 
 To force a specific env file path:
@@ -100,12 +106,12 @@ MSTV_DESKTOP_ENV_FILE=/absolute/path/to/.env.local npm run desktop:dev
 The desktop log reports which env file was found and which required keys are present or missing. It never logs secret values.
 
 ```bash
-~/Library/Application Support/MSTV Remote/desktop.log
+~/Library/Application Support/MSTV Visio/desktop.log
 ```
 
 ## macOS Camera And Microphone Permissions
 
-MSTV Remote must be allowed to use camera and microphone devices before STUDIO
+MSTV Visio must be allowed to use camera and microphone devices before STUDIO
 or REGIE inputs can publish a return feed. The packaged app includes
 `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, and the macOS camera
 and audio-input entitlements on the main app and Electron helper bundles.
@@ -117,9 +123,9 @@ System Settings > Privacy & Security > Camera
 System Settings > Privacy & Security > Microphone
 ```
 
-Enable `MSTV Remote`, then quit and reopen the app. On some development builds,
+Enable `MSTV Visio`, then quit and reopen the app. On some development builds,
 macOS may ask again after rebuilding the `.app`.
 
-If MSTV Remote still does not appear, launch the rebuilt `.app` once from Finder
+If MSTV Visio still does not appear, launch the rebuilt `.app` once from Finder
 or with `npm run desktop:open`, then select a STUDIO/REGIE video or audio input
 so macOS receives an actual camera/microphone access request.

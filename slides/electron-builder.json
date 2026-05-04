@@ -1,6 +1,6 @@
 {
-  "appId": "tv.monstudio.mstvslidesreceiver",
-  "productName": "MSTV Slides Receiver",
+  "appId": "tv.monstudio.mstvclick",
+  "productName": "MSTV Click",
   "electronVersion": "27.3.11",
   "directories": {
     "output": "dist-slides"
@@ -13,7 +13,7 @@
   ],
   "extraMetadata": {
     "main": "slides/main.cjs",
-    "name": "mstv-slides-receiver"
+    "name": "mstv-click"
   },
   "mac": {
     "category": "public.app-category.productivity",
@@ -23,7 +23,7 @@
     "entitlementsInherit": "slides/entitlements.mac.plist",
     "extendInfo": {
       "LSMinimumSystemVersion": "10.15.0",
-      "NSAppleEventsUsageDescription": "MSTV Slides Receiver envoie les touches flèche gauche/droite à l’application de présentation active."
+      "NSAppleEventsUsageDescription": "MSTV Click envoie les touches flèche gauche/droite à l’application de présentation active."
     }
   }
 }

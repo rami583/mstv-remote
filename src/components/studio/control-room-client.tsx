@@ -961,7 +961,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         }
       } catch {
         // The visible receiver status is still driven by actual command sends.
-        // This heartbeat only lets the receiver app know MSTV Remote is using it.
+        // This heartbeat only lets the receiver app know MSTV Visio is using it.
       }
     }
 

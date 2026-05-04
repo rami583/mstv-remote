@@ -6,14 +6,14 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../..");
 const candidates = [
-  path.join(projectRoot, "dist-slides", "mac-x64", "MSTV Slides Receiver.app"),
-  path.join(projectRoot, "dist-slides", "mac-arm64", "MSTV Slides Receiver.app"),
-  path.join(projectRoot, "dist-slides", "mac", "MSTV Slides Receiver.app")
+  path.join(projectRoot, "dist-slides", "mac-x64", "MSTV Click.app"),
+  path.join(projectRoot, "dist-slides", "mac-arm64", "MSTV Click.app"),
+  path.join(projectRoot, "dist-slides", "mac", "MSTV Click.app")
 ];
 const appPath = candidates.find((candidate) => fs.existsSync(candidate));
 
 if (!appPath) {
-  console.error("MSTV Slides Receiver.app was not found. Run npm run slides:build first.");
+  console.error("MSTV Click.app was not found. Run npm run slides:build first.");
   process.exit(1);
 }
 

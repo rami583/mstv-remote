@@ -7,7 +7,7 @@ export default function HomePage() {
     <main className="min-h-screen px-6 py-10 md:px-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-8">
         <section className="panel-strong rounded-[28px] p-8 shadow-panel">
-          <p className="text-sm uppercase tracking-[0.28em] text-air">Visio MSTV</p>
+          <p className="text-sm uppercase tracking-[0.28em] text-air">MSTV Visio</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">
             Studio-first routing for remote contribution, not a generic meeting room.
           </h1>

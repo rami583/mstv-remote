@@ -138,6 +138,7 @@ function getDesktopEnvCandidates() {
   if (app.isPackaged) {
     candidates.push(
       path.join(app.getPath("userData"), ".env.local"),
+      path.join(app.getPath("home"), "Library", "Application Support", "MSTV Remote", ".env.local"),
       path.join(app.getPath("home"), ".mstv-remote", ".env.local"),
       ...findAncestorEnvFiles(process.resourcesPath)
     );
@@ -388,7 +389,7 @@ function attachLoadFailureHandling(window, label, url) {
         <html>
           <head>
             <meta charset="utf-8" />
-            <title>MSTV Remote</title>
+            <title>MSTV Visio</title>
             <style>
               body {
                 align-items: center;
@@ -460,7 +461,7 @@ async function createControlWindow() {
     minWidth: fixedWidth,
     maxWidth: fixedWidth,
     minHeight: 720,
-    title: "MSTV Remote",
+    title: "MSTV Visio",
     backgroundColor: "#000000",
     webPreferences: {
       contextIsolation: true,
@@ -505,7 +506,7 @@ async function createProgramWindow(displayId, roomSlug) {
     frame: false,
     fullscreen: true,
     autoHideMenuBar: true,
-    title: "MSTV Remote Program",
+    title: "MSTV Visio Program",
     backgroundColor: "#000000",
     webPreferences: {
       contextIsolation: true,
@@ -736,7 +737,7 @@ function showStartupError(error) {
   const bounds = centeredBounds(primaryDisplay, 900, 520);
   const errorWindow = new BrowserWindow({
     ...bounds,
-    title: "MSTV Remote",
+    title: "MSTV Visio",
     backgroundColor: "#050505",
     webPreferences: {
       contextIsolation: true,
@@ -752,7 +753,7 @@ function showStartupError(error) {
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>MSTV Remote</title>
+          <title>MSTV Visio</title>
           <style>
             body {
               align-items: center;
@@ -787,7 +788,7 @@ function showStartupError(error) {
         </head>
         <body>
           <main>
-            <h1>MSTV Remote n'a pas pu démarrer</h1>
+            <h1>MSTV Visio n'a pas pu démarrer</h1>
             <p>La fenêtre native s'ouvre correctement, mais le serveur local de l'application n'est pas disponible.</p>
             <p><code>${message}</code></p>
             <p>Journal: <code>${logFilePath || ""}</code></p>
@@ -797,10 +798,10 @@ function showStartupError(error) {
     `)}`
   );
 
-  dialog.showErrorBox("MSTV Remote", message);
+  dialog.showErrorBox("MSTV Visio", message);
 }
 
-app.name = "MSTV Remote";
+app.name = "MSTV Visio";
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.whenReady().then(async () => {
