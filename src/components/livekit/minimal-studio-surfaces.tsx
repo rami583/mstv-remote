@@ -1330,6 +1330,11 @@ function ControlGuestGridContent({
         {guests.map((guest) => {
         const trackRef = participantTrackMap.get(guest.participantId);
         const selectionLimitReached = !guest.inProgram && guests.filter((item) => item.inProgram).length >= 3;
+        const sourcePillClassNames: Record<ReturnSource, string> = {
+          STUDIO: "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
+          REGIE: "border-transparent bg-amber-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
+          IMAGE: "border-transparent bg-slate-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+        };
         const toggleProgramSelection = () => {
           if (selectionLimitReached) {
             return;
@@ -1380,14 +1385,14 @@ function ControlGuestGridContent({
 
               <div className="pointer-events-none absolute left-4 top-4 z-20 flex gap-2">
                 <div
-                  className={`rounded-full border px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] ${getIndicatorClasses(
+                  className={`rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] ${getIndicatorClasses(
                     guest.microphoneIndicator.tone
                   )}`}
                 >
                   Mic
                 </div>
                 <div
-                  className={`rounded-full border px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] ${getIndicatorClasses(
+                  className={`rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] ${getIndicatorClasses(
                     guest.cameraIndicator.tone
                   )}`}
                 >
@@ -1396,7 +1401,7 @@ function ControlGuestGridContent({
               </div>
 
               {guest.selectionOrder ? (
-                <div className="pointer-events-none absolute right-4 top-4 z-20 rounded-full border border-air/30 bg-air/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-air">
+                <div className="pointer-events-none absolute right-4 top-4 z-20 rounded-full border border-transparent bg-emerald-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.24em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
                   {guest.selectionOrder}
                 </div>
               ) : null}
@@ -1413,12 +1418,6 @@ function ControlGuestGridContent({
                   >
                     {(["STUDIO", "REGIE", "IMAGE"] as const).map((source) => {
                       const isActive = guest.effectiveReturnSource === source;
-                      const activeClassName =
-                        source === "STUDIO"
-                          ? "border-air/30 bg-air/10 text-air"
-                          : source === "REGIE"
-                            ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
-                            : "border-white/20 bg-white/10 text-white";
 
                       return (
                         <button
@@ -1429,12 +1428,12 @@ function ControlGuestGridContent({
                             event.stopPropagation();
                             onSelectGuestReturnSource?.(guest.participantId, source);
                           }}
-                          className={`rounded-full border px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.16em] transition ${
+                          className={`rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition ${
                             isActive
-                              ? activeClassName
-                              : "border-white/10 bg-black/70 text-slate-400 hover:border-white/20 hover:text-slate-100"
+                              ? sourcePillClassNames[source]
+                              : "border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-slate-500"
                           } ${
-                            guest.returnSourceControlDisabled ? "cursor-default opacity-60" : ""
+                            guest.returnSourceControlDisabled ? "cursor-default opacity-90" : ""
                           }`}
                         >
                           {source}
@@ -1447,10 +1446,10 @@ function ControlGuestGridContent({
                         event.stopPropagation();
                         onToggleGuestSlideControl?.(guest.participantId);
                       }}
-                      className={`rounded-full border px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.16em] transition ${
+                      className={`rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition ${
                         guest.slideControlEnabled
-                          ? "border-air/30 bg-air/10 text-air"
-                          : "border-white/10 bg-black/70 text-slate-400 hover:border-white/20 hover:text-slate-100"
+                          ? "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+                          : "border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-slate-500"
                       }`}
                     >
                       Slides

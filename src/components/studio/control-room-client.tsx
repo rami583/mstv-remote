@@ -262,7 +262,7 @@ function StudioInputTile(input: {
 
         <div className="absolute left-4 top-4 flex flex-wrap gap-2">
           <div
-            className={`rounded-full border px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] ${input.statusToneClassName}`}
+            className={`rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] shadow-[0_2px_10px_rgba(0,0,0,0.35)] ${input.statusToneClassName}`}
           >
             {input.label}
           </div>
@@ -1617,8 +1617,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     return {
       toneClassName:
         inputId === visuallyActiveReturnSource
-          ? "border-air/30 bg-air/10 text-air"
-          : "border-tally/30 bg-tally/10 text-tally"
+          ? "border-transparent bg-emerald-500 text-white"
+          : "border-transparent bg-tally text-white"
     };
   }
 

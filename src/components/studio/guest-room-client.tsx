@@ -644,12 +644,12 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
 
               <div className="absolute left-2 top-2 z-20 flex gap-1.5">
                 <div
-                  className={`rounded-full border px-2 py-1 text-[9px] font-medium uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
+                  className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
                 >
                   Mic
                 </div>
                 <div
-                  className={`rounded-full border px-2 py-1 text-[9px] font-medium uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
+                  className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
                 >
                   Cam
                 </div>

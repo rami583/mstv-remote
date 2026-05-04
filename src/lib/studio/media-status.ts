@@ -109,10 +109,10 @@ export function computeVideoDeviceIndicator(trackState: TrackRuntimeState): Medi
 export function getIndicatorClasses(tone: MediaStatusIndicator["tone"]) {
   switch (tone) {
     case "green":
-      return "border-air/30 bg-air/10 text-air";
+      return "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
     case "red":
-      return "border-tally/30 bg-tally/10 text-tally";
+      return "border-transparent bg-tally text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
     case "orange":
-      return "border-signal/30 bg-signal/10 text-signal";
+      return "border-transparent bg-amber-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
   }
 }
