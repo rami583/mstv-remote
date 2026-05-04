@@ -1335,6 +1335,10 @@ function ControlGuestGridContent({
           REGIE: "border-transparent bg-amber-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
           IMAGE: "border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
         };
+        const pillBaseClassName =
+          "mstv-compact-control-sm rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.16em]";
+        const neutralPillClassName =
+          "border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-slate-500";
         const toggleProgramSelection = () => {
           if (selectionLimitReached) {
             return;
@@ -1385,14 +1389,14 @@ function ControlGuestGridContent({
 
               <div className="pointer-events-none absolute left-4 top-4 z-20 flex gap-2">
                 <div
-                  className={`rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] ${getIndicatorClasses(
+                  className={`${pillBaseClassName} ${getIndicatorClasses(
                     guest.microphoneIndicator.tone
                   )}`}
                 >
                   Mic
                 </div>
                 <div
-                  className={`rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] ${getIndicatorClasses(
+                  className={`${pillBaseClassName} ${getIndicatorClasses(
                     guest.cameraIndicator.tone
                   )}`}
                 >
@@ -1406,13 +1410,15 @@ function ControlGuestGridContent({
                 </div>
               ) : null}
 
-              <div className="absolute bottom-0 left-0 right-0 z-20 flex items-end justify-between gap-3 p-4">
-                <div>
-                  <p className="text-base font-semibold text-white">{guest.displayName}</p>
+              <div className="absolute bottom-0 left-0 right-0 z-20 flex items-end gap-3 p-4">
+                <div className="w-[30%] min-w-0 max-w-[11rem] shrink-0">
+                  <p className="truncate text-base font-semibold text-white" title={guest.displayName}>
+                    {guest.displayName}
+                  </p>
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div
-                    className="flex items-center gap-1.5"
+                    className="flex min-w-0 flex-wrap items-center justify-end gap-1.5"
                     onClick={(event) => event.stopPropagation()}
                     onPointerDown={(event) => event.stopPropagation()}
                   >
@@ -1428,10 +1434,8 @@ function ControlGuestGridContent({
                             event.stopPropagation();
                             onSelectGuestReturnSource?.(guest.participantId, source);
                           }}
-                          className={`mstv-compact-control-sm rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition ${
-                            isActive
-                              ? sourcePillClassNames[source]
-                              : "border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-slate-500"
+                          className={`${pillBaseClassName} transition ${
+                            isActive ? sourcePillClassNames[source] : neutralPillClassName
                           } ${
                             guest.returnSourceControlDisabled ? "cursor-default opacity-90" : ""
                           }`}
@@ -1446,10 +1450,10 @@ function ControlGuestGridContent({
                         event.stopPropagation();
                         onToggleGuestSlideControl?.(guest.participantId);
                       }}
-                      className={`mstv-compact-control-sm rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition ${
+                      className={`${pillBaseClassName} transition ${
                         guest.slideControlEnabled
                           ? "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
-                          : "border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] hover:bg-slate-500"
+                          : neutralPillClassName
                       }`}
                     >
                       Slides
@@ -1469,10 +1473,10 @@ function ControlGuestGridContent({
                         }
                         onDisconnectGuest?.(guest.participantId);
                       }}
-                      className={`mstv-compact-control-sm rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] font-medium text-slate-300 transition ${
+                      className={`${pillBaseClassName} border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition ${
                         guest.disconnectControlDisabled
                           ? "cursor-default opacity-40"
-                          : "hover:border-white/20 hover:text-white"
+                          : "hover:bg-slate-500"
                       }`}
                     >
                       Déconnecter
