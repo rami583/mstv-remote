@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../..");
 const candidates = [
+  path.join(projectRoot, "dist-slides", "mac-x64", "MSTV Slides Receiver.app"),
   path.join(projectRoot, "dist-slides", "mac-arm64", "MSTV Slides Receiver.app"),
   path.join(projectRoot, "dist-slides", "mac", "MSTV Slides Receiver.app")
 ];

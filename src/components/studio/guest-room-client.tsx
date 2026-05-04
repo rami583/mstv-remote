@@ -454,6 +454,10 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
   }, []);
 
   async function handleConfirmJoin() {
+    if (isJoiningLive || isCheckingMediaAccess) {
+      return;
+    }
+
     if (!guestName.trim()) {
       setError("Entrez votre nom pour continuer.");
       return;
@@ -553,7 +557,13 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                 </div>
               ) : null}
             </div>
-            <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2.5 px-2 pt-3 text-center">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleConfirmJoin();
+              }}
+              className="mx-auto flex w-full max-w-sm flex-col items-center gap-2.5 px-2 pt-3 text-center"
+            >
               <p className="text-sm text-slate-200">Placez-vous correctement dans l’image.</p>
               <input
                 value={guestName}
@@ -567,8 +577,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                 className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-slate-100 outline-none"
               />
               <button
-                type="button"
-                onClick={handleConfirmJoin}
+                type="submit"
                 disabled={isJoiningLive || isCheckingMediaAccess}
                 className="rounded-lg border border-air/30 bg-air/10 px-5 py-2.5 text-sm font-medium text-air transition hover:bg-air/15 disabled:opacity-60"
               >
@@ -581,7 +590,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               {error && error !== previewMessage ? (
                 <p className="text-xs text-signal">{error}</p>
               ) : null}
-            </div>
+            </form>
           </div>
         </div>
       </main>

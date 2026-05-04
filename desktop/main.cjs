@@ -12,6 +12,7 @@ const CONTROL_TILE_WIDTH = 390;
 const CONTROL_TILE_GAP = 12;
 const CONTROL_PAGE_HORIZONTAL_PADDING = 48;
 const CONTROL_WINDOW_WIDTH = CONTROL_TILE_WIDTH * 3 + CONTROL_TILE_GAP * 2 + CONTROL_PAGE_HORIZONTAL_PADDING;
+const SLIDE_RECEIVER_TIMEOUT_MS = 10_000;
 
 let nextServerProcess = null;
 let controlWindow = null;
@@ -544,7 +545,7 @@ function buildSlideReceiverUrl(input) {
     throw new Error("Slide receiver host is not configured.");
   }
 
-  const base = rawHost.startsWith("http://") ? rawHost : `http://${rawHost}`;
+  const base = /^https?:\/\//i.test(rawHost) ? rawHost : `http://${rawHost}`;
   const url = new URL(base);
 
   if (!url.port && rawPort) {
@@ -558,49 +559,85 @@ function buildSlideReceiverUrl(input) {
   return url;
 }
 
-function postSlideReceiverCommand(input) {
+function parseJsonIfPossible(value) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+async function postSlideReceiverCommand(input) {
   const url = buildSlideReceiverUrl(input);
+  const urlString = url.toString();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, SLIDE_RECEIVER_TIMEOUT_MS);
 
   log("Sending slide receiver command", {
-    url: url.toString(),
-    command: input?.command
+    url: urlString,
+    method: "POST",
+    command: input?.command,
+    timeoutMs: SLIDE_RECEIVER_TIMEOUT_MS
   });
 
-  return new Promise((resolve, reject) => {
-    const request = http.request(
-      url,
-      {
-        method: "POST",
-        timeout: 2500
+  try {
+    const response = await fetch(urlString, {
+      method: "POST",
+      headers: {
+        Accept: "application/json"
       },
-      (response) => {
-        response.resume();
-
-        response.on("end", () => {
-          if (response.statusCode && response.statusCode >= 200 && response.statusCode < 300) {
-            resolve({
-              ok: true,
-              statusCode: response.statusCode,
-              url: url.toString()
-            });
-            return;
-          }
-
-          reject(
-            new Error(
-              `Slide receiver responded with HTTP ${response.statusCode || "unknown"}.`
-            )
-          );
-        });
-      }
-    );
-
-    request.on("timeout", () => {
-      request.destroy(new Error("Slide receiver did not respond."));
+      signal: controller.signal
     });
-    request.on("error", reject);
-    request.end();
-  });
+    const responseBody = await response.text();
+    const jsonBody = parseJsonIfPossible(responseBody);
+
+    log("Slide receiver response", {
+      url: urlString,
+      method: "POST",
+      statusCode: response.status,
+      ok: response.ok,
+      body: responseBody
+    });
+
+    if (!response.ok) {
+      throw new Error(`Slide receiver responded with HTTP ${response.status}: ${responseBody}`);
+    }
+
+    if (!jsonBody || jsonBody.ok !== true || (jsonBody.accepted !== true && jsonBody.accepted !== undefined)) {
+      throw new Error(`Slide receiver returned an invalid response: ${responseBody || "empty body"}`);
+    }
+
+    return {
+      ok: true,
+      statusCode: response.status,
+      url: urlString,
+      body: jsonBody
+    };
+  } catch (error) {
+    const isAbortError = error instanceof Error && error.name === "AbortError";
+    const message = isAbortError
+      ? `Slide receiver did not respond within ${SLIDE_RECEIVER_TIMEOUT_MS}ms.`
+      : error instanceof Error
+        ? error.message
+        : String(error);
+
+    log("Slide receiver request error", {
+      url: urlString,
+      method: "POST",
+      command: input?.command,
+      message
+    });
+
+    throw new Error(message);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function configureDesktopIpc() {

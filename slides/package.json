@@ -1,0 +1,9 @@
+{
+  "name": "mstv-slides-receiver",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.cjs",
+  "devDependencies": {
+    "electron": "27.3.11"
+  }
+}

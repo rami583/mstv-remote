@@ -7,6 +7,8 @@ const path = require("node:path");
 const DEFAULT_PORT = 4317;
 const SERVER_HOST = "0.0.0.0";
 const REMOTE_CONTACT_TIMEOUT_MS = 30_000;
+const DEFAULT_TARGET_APP = "Microsoft PowerPoint";
+const TARGET_APPS = new Set(["Microsoft PowerPoint", "Keynote", "Preview"]);
 
 let mainWindow = null;
 let server = null;
@@ -18,7 +20,8 @@ let serverState = {
   localAddresses: [],
   lastCommand: null,
   lastError: null,
-  lastRemoteContactAt: null
+  lastRemoteContactAt: null,
+  selectedTargetApp: DEFAULT_TARGET_APP
 };
 
 function getLocalAddresses() {
@@ -66,9 +69,21 @@ function markRemoteContact() {
   emitState();
 }
 
-function runAppleScript(script) {
+function setSelectedTargetApp(value) {
+  const nextTargetApp = TARGET_APPS.has(value) ? value : DEFAULT_TARGET_APP;
+
+  serverState = {
+    ...serverState,
+    selectedTargetApp: nextTargetApp
+  };
+  emitState();
+
+  return nextTargetApp;
+}
+
+function runAppleScript(script, timeoutMs = 1500) {
   return new Promise((resolve, reject) => {
-    execFile("/usr/bin/osascript", ["-e", script], (error, stdout) => {
+    execFile("/usr/bin/osascript", ["-e", script], { timeout: timeoutMs }, (error, stdout) => {
       if (error) {
         reject(error);
         return;
@@ -85,28 +100,29 @@ function delay(ms) {
   });
 }
 
-async function getActiveSlidesAppName() {
-  const applicationName = await runAppleScript(`
-    tell application "System Events"
-      if exists process "Keynote" then return "Keynote"
-      if exists process "Microsoft PowerPoint" then return "Microsoft PowerPoint"
-    end tell
-    return ""
-  `);
-
-  if (!applicationName) {
-    throw new Error("Keynote or Microsoft PowerPoint must be running.");
-  }
-
-  return applicationName;
-}
-
 function getFallbackKeyCodes(applicationName, direction) {
   if (applicationName === "Microsoft PowerPoint") {
-    return direction === "next" ? ["124", "125", "49"] : ["123", "126"];
+    return direction === "next" ? ["124"] : ["123"];
+  }
+
+  if (applicationName === "Preview") {
+    return direction === "next" ? ["124"] : ["123"];
   }
 
   return direction === "next" ? ["124"] : ["123"];
+}
+
+function getSlideExecutionDiagnostics(commandState) {
+  const steps = commandState?.steps ?? [];
+
+  return {
+    targetApp: commandState?.applicationName ?? "none",
+    appActivated: steps.some((step) => step.startsWith("app-activated:")),
+    appleScriptSucceeded: steps.some((step) => step.startsWith("applescript-ok:")),
+    appleScriptFailed: steps.some((step) => step.startsWith("applescript-failed:")),
+    keyboardFallbackSent: steps.some((step) => step.startsWith("keyboard-sent:")),
+    lastExecutionError: serverState.lastError
+  };
 }
 
 function emitState() {
@@ -118,6 +134,7 @@ function emitState() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("slides:state", {
       ...serverState,
+      executionDiagnostics: getSlideExecutionDiagnostics(serverState.lastCommand),
       accessibilityTrusted: isAccessibilityTrusted(false),
       connectionState: getConnectionState()
     });
@@ -140,19 +157,40 @@ async function sendPowerPointCommand(direction) {
   return `powerpoint-applescript-${commandName}`;
 }
 
-async function sendSlideCommand(direction) {
-  const applicationName = await getActiveSlidesAppName();
-  const steps = [];
+async function sendKeynoteCommand(direction) {
+  const commandName = direction === "next" ? "show next" : "show previous";
 
-  await runAppleScript(`tell application ${JSON.stringify(applicationName)} to activate`);
-  steps.push(`activated ${applicationName}`);
-  await delay(500);
+  await runAppleScript(`
+    tell application "Keynote"
+      if playing then
+        ${commandName}
+      else
+        error "Keynote must be in presentation/play mode."
+      end if
+    end tell
+  `);
+
+  return `keynote-applescript-${direction}`;
+}
+
+async function sendSlideCommand(direction) {
+  const applicationName = serverState.selectedTargetApp || DEFAULT_TARGET_APP;
+  const steps = [`target-app:${applicationName}`];
+
+  try {
+    await runAppleScript(`tell application ${JSON.stringify(applicationName)} to activate`, 1200);
+    steps.push(`app-activated:${applicationName}`);
+  } catch (error) {
+    steps.push(`app-activation-failed:${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
+  await delay(150);
 
   if (applicationName === "Microsoft PowerPoint") {
     try {
       const method = await sendPowerPointCommand(direction);
 
-      steps.push(method);
+      steps.push(`applescript-ok:${method}`);
       return {
         applicationName,
         method,
@@ -160,17 +198,34 @@ async function sendSlideCommand(direction) {
       };
     } catch (error) {
       steps.push(
-        `powerpoint-applescript-failed: ${error instanceof Error ? error.message : String(error)}`
+        `applescript-failed:${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  if (applicationName === "Keynote") {
+    try {
+      const method = await sendKeynoteCommand(direction);
+
+      steps.push(`applescript-ok:${method}`);
+      return {
+        applicationName,
+        method,
+        steps
+      };
+    } catch (error) {
+      steps.push(
+        `applescript-failed:${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
 
   const keyCodes = getFallbackKeyCodes(applicationName, direction);
+  const [keyCode] = keyCodes;
 
-  for (const keyCode of keyCodes) {
+  if (keyCode) {
     await runAppleScript(`tell application "System Events" to key code ${keyCode}`);
-    steps.push(`key code ${keyCode} sent`);
-    await delay(80);
+    steps.push(`keyboard-sent:key-code-${keyCode}`);
   }
 
   return {
@@ -190,50 +245,72 @@ function writeJson(response, statusCode, body) {
   response.end(JSON.stringify(body));
 }
 
-async function handleSlideCommand(command, response) {
+function executeSlideCommand(command, receivedAt) {
+  void sendSlideCommand(command)
+    .then((commandResult) => {
+      serverState = {
+        ...serverState,
+        lastCommand: {
+          command,
+          receivedAt,
+          ok: true,
+          accepted: true,
+          completedAt: new Date().toISOString(),
+          applicationName: commandResult.applicationName,
+          method: commandResult.method,
+          steps: commandResult.steps
+        },
+        lastError: null
+      };
+      emitState();
+    })
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+
+      serverState = {
+        ...serverState,
+        lastCommand: {
+          command,
+          receivedAt,
+          ok: false,
+          accepted: true,
+          completedAt: new Date().toISOString(),
+          applicationName: null,
+          method: null,
+          steps: []
+        },
+        lastError: message
+      };
+      emitState();
+    });
+}
+
+function handleSlideCommand(command, response) {
   const receivedAt = new Date().toISOString();
 
   markRemoteContact();
-
-  try {
-    const commandResult = await sendSlideCommand(command);
-    serverState = {
-      ...serverState,
-      lastCommand: {
-        command,
-        receivedAt,
-        ok: true,
-        applicationName: commandResult.applicationName,
-        method: commandResult.method,
-        steps: commandResult.steps
-      },
-      lastError: null
-    };
-    emitState();
-    writeJson(response, 200, { ok: true, command, receivedAt, ...commandResult });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-
-    serverState = {
-      ...serverState,
-      lastCommand: {
-        command,
-        receivedAt,
-        ok: false,
-        applicationName: null,
-        method: null,
-        steps: []
-      },
-      lastError: message
-    };
-    emitState();
-    writeJson(response, 500, {
-      ok: false,
+  serverState = {
+    ...serverState,
+    lastCommand: {
       command,
-      error: message,
-      accessibilityTrusted: isAccessibilityTrusted(false)
-    });
-  }
+      receivedAt,
+      ok: null,
+      accepted: true,
+      completedAt: null,
+      applicationName: null,
+      method: "pending",
+      steps: []
+    },
+    lastError: null
+  };
+  emitState();
+  writeJson(response, 200, {
+    ok: true,
+    accepted: true,
+    command,
+    receivedAt
+  });
+  executeSlideCommand(command, receivedAt);
 }
 
 function createServer() {
@@ -261,12 +338,12 @@ function createServer() {
     }
 
     if (request.method === "POST" && request.url === "/next") {
-      void handleSlideCommand("next", response);
+      handleSlideCommand("next", response);
       return;
     }
 
     if (request.method === "POST" && request.url === "/prev") {
-      void handleSlideCommand("prev", response);
+      handleSlideCommand("prev", response);
       return;
     }
 
@@ -339,8 +416,8 @@ function stopServer() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 380,
-    height: 240,
+    width: 430,
+    height: 360,
     resizable: false,
     maximizable: false,
     minimizable: true,
@@ -367,11 +444,13 @@ app.whenReady().then(() => {
   ipcMain.handle("slides:get-state", () => ({
     ...serverState,
     localAddresses: getLocalAddresses(),
+    executionDiagnostics: getSlideExecutionDiagnostics(serverState.lastCommand),
     accessibilityTrusted: isAccessibilityTrusted(false),
     connectionState: getConnectionState()
   }));
   ipcMain.handle("slides:start", async (_event, port) => startServer(Number(port) || DEFAULT_PORT));
   ipcMain.handle("slides:stop", async () => stopServer());
+  ipcMain.handle("slides:set-target-app", (_event, value) => setSelectedTargetApp(value));
   ipcMain.handle("slides:request-accessibility", () => isAccessibilityTrusted(true));
   ipcMain.handle("slides:open-accessibility-settings", () =>
     shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")

@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("mstvSlides", {
   getState: () => ipcRenderer.invoke("slides:get-state"),
   start: (port) => ipcRenderer.invoke("slides:start", port),
   stop: () => ipcRenderer.invoke("slides:stop"),
+  setTargetApp: (value) => ipcRenderer.invoke("slides:set-target-app", value),
   requestAccessibility: () => ipcRenderer.invoke("slides:request-accessibility"),
   openAccessibilitySettings: () => ipcRenderer.invoke("slides:open-accessibility-settings"),
   onState: (callback) => {

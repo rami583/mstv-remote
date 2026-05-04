@@ -1,6 +1,7 @@
 {
   "appId": "tv.monstudio.mstvslidesreceiver",
   "productName": "MSTV Slides Receiver",
+  "electronVersion": "27.3.11",
   "directories": {
     "output": "dist-slides"
   },
@@ -21,6 +22,7 @@
     "entitlements": "slides/entitlements.mac.plist",
     "entitlementsInherit": "slides/entitlements.mac.plist",
     "extendInfo": {
+      "LSMinimumSystemVersion": "10.15.0",
       "NSAppleEventsUsageDescription": "MSTV Slides Receiver envoie les touches flèche gauche/droite à l’application de présentation active."
     }
   }

@@ -57,7 +57,7 @@
       }
 
       h1 {
-        margin: 0 0 16px;
+        margin: 0 0 14px;
         max-width: 100%;
         font-size: 34px;
         line-height: 0.96;
@@ -109,6 +109,70 @@
         max-width: 100%;
       }
 
+      .target-selector {
+        display: flex;
+        width: min(100%, 320px);
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 12px;
+        color: #94a3b8;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      select {
+        min-width: 150px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: #050505;
+        padding: 7px 10px;
+        color: #f8fafc;
+        font-size: 11px;
+        outline: none;
+      }
+
+      .diagnostics {
+        display: grid;
+        width: min(100%, 360px);
+        gap: 5px;
+        margin-top: 14px;
+        text-align: left;
+      }
+
+      .diagnostic-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding-bottom: 4px;
+        color: #94a3b8;
+        font-size: 10px;
+        line-height: 1.2;
+      }
+
+      .diagnostic-value {
+        max-width: 210px;
+        color: #f8fafc;
+        overflow: hidden;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .diagnostic-value.ok {
+        color: #86efac;
+      }
+
+      .diagnostic-value.warn {
+        color: #fde68a;
+      }
+
+      .diagnostic-value.error {
+        color: #fca5a5;
+      }
+
       button {
         cursor: pointer;
         border: 1px solid rgba(255, 255, 255, 0.14);
@@ -146,6 +210,38 @@
           <button id="settings-button" type="button">Ouvrir les réglages</button>
           <p id="problem" class="problem"></p>
         </div>
+
+        <label class="target-selector">
+          <span>Application</span>
+          <select id="target-app-select">
+            <option value="Microsoft PowerPoint">PowerPoint</option>
+            <option value="Keynote">Keynote</option>
+            <option value="Preview">Aperçu / Preview</option>
+          </select>
+        </label>
+
+        <div id="diagnostics" class="diagnostics" hidden>
+          <div class="diagnostic-row">
+            <span>Commande</span>
+            <span id="diag-command" class="diagnostic-value">-</span>
+          </div>
+          <div class="diagnostic-row">
+            <span>Application</span>
+            <span id="diag-app" class="diagnostic-value">-</span>
+          </div>
+          <div class="diagnostic-row">
+            <span>Activation</span>
+            <span id="diag-activated" class="diagnostic-value">-</span>
+          </div>
+          <div class="diagnostic-row">
+            <span>Méthode</span>
+            <span id="diag-method" class="diagnostic-value">-</span>
+          </div>
+          <div class="diagnostic-row">
+            <span>Erreur</span>
+            <span id="diag-error" class="diagnostic-value">-</span>
+          </div>
+        </div>
       </section>
     </main>
 
@@ -155,6 +251,57 @@
       const detailsElement = document.getElementById("details");
       const settingsButton = document.getElementById("settings-button");
       const problemElement = document.getElementById("problem");
+      const targetAppSelect = document.getElementById("target-app-select");
+      const diagnosticsElement = document.getElementById("diagnostics");
+      const diagCommandElement = document.getElementById("diag-command");
+      const diagAppElement = document.getElementById("diag-app");
+      const diagActivatedElement = document.getElementById("diag-activated");
+      const diagMethodElement = document.getElementById("diag-method");
+      const diagErrorElement = document.getElementById("diag-error");
+
+      function setDiagnosticValue(element, value, tone = "") {
+        element.textContent = value;
+        element.className = `diagnostic-value ${tone}`.trim();
+        element.title = value;
+      }
+
+      function renderDiagnostics(state) {
+        const command = state.lastCommand;
+
+        diagnosticsElement.hidden = !command;
+
+        if (!command) {
+          return;
+        }
+
+        const diagnostics = state.executionDiagnostics || {};
+        const selectedTargetApp = state.selectedTargetApp || "Microsoft PowerPoint";
+        const keyboardSucceeded = diagnostics.keyboardFallbackSent && command.ok !== false;
+        const commandSucceeded = command.ok === true || keyboardSucceeded || diagnostics.appleScriptSucceeded;
+        const commandPending = command.method === "pending" || command.ok === null;
+        const methodLabel = diagnostics.keyboardFallbackSent
+          ? "clavier"
+          : diagnostics.appleScriptSucceeded
+            ? "AppleScript"
+            : commandPending
+              ? "en cours"
+              : "-";
+        const visibleError = commandSucceeded ? "" : diagnostics.lastExecutionError || "";
+
+        setDiagnosticValue(
+          diagCommandElement,
+          command.command || "-",
+          commandSucceeded ? "ok" : commandPending ? "warn" : "error"
+        );
+        setDiagnosticValue(
+          diagAppElement,
+          diagnostics.targetApp && diagnostics.targetApp !== "none" ? diagnostics.targetApp : selectedTargetApp,
+          "ok"
+        );
+        setDiagnosticValue(diagActivatedElement, diagnostics.appActivated ? "OK" : "Non", diagnostics.appActivated ? "ok" : "warn");
+        setDiagnosticValue(diagMethodElement, methodLabel, commandSucceeded ? "ok" : commandPending ? "warn" : "");
+        setDiagnosticValue(diagErrorElement, visibleError || "-", visibleError ? "error" : "");
+      }
 
       function renderState(state) {
         const connectionState = state.connectionState || (state.running ? "waiting" : "unavailable");
@@ -166,7 +313,9 @@
           connected ? "connected" : waiting ? "waiting" : "disconnected"
         }`;
         statusText.textContent = connected ? "CONNECTÉ" : waiting ? "EN ATTENTE" : "NON DISPONIBLE";
+        targetAppSelect.value = state.selectedTargetApp || "Microsoft PowerPoint";
         detailsElement.hidden = true;
+        renderDiagnostics(state);
 
         if (unavailable) {
           detailsElement.hidden = false;
@@ -186,6 +335,11 @@
       settingsButton.addEventListener("click", async () => {
         await window.mstvSlides.requestAccessibility();
         await window.mstvSlides.openAccessibilitySettings();
+        renderState(await window.mstvSlides.getState());
+      });
+
+      targetAppSelect.addEventListener("change", async () => {
+        await window.mstvSlides.setTargetApp(targetAppSelect.value);
         renderState(await window.mstvSlides.getState());
       });
 
