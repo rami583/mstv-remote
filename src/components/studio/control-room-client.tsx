@@ -1775,8 +1775,14 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
         <details className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
           <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3">
+            <span className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+              Réglages slides
+            </span>
+            {lastSlideCommandFeedback ? (
+              <span className="text-xs text-slate-400">{lastSlideCommandFeedback.label}</span>
+            ) : null}
             <span
-              className={`mstv-compact-control rounded-full border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+              className={`mstv-compact-control ml-auto rounded-full border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${
                 slideReceiverCompactStatus === "connecté"
                   ? "border-transparent bg-emerald-500 text-white"
                   : slideReceiverCompactStatus === "erreur"
@@ -1785,12 +1791,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               }`}
             >
               Slides : {slideReceiverCompactStatus}
-            </span>
-            {lastSlideCommandFeedback ? (
-              <span className="text-xs text-slate-400">{lastSlideCommandFeedback.label}</span>
-            ) : null}
-            <span className="ml-auto text-[11px] uppercase tracking-[0.18em] text-slate-500">
-              Réglages slides
             </span>
           </summary>
           <div className="mt-3 flex flex-wrap items-center gap-3">
