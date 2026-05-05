@@ -265,23 +265,44 @@ function configureApplicationMenu() {
             }
           },
           { type: "separator" },
-          { role: "undo", label: "Annuler" },
-          { role: "redo", label: "Rétablir" },
-          { type: "separator" },
-          { role: "cut", label: "Couper" },
-          { role: "copy", label: "Copier" },
-          { role: "paste", label: "Coller" },
-          { role: "selectAll", label: "Tout sélectionner" },
-          { type: "separator" },
-          { role: "hide", label: `Masquer ${appName}` },
-          { role: "hideOthers", label: "Masquer les autres" },
-          { role: "unhide", label: "Tout afficher" },
-          { type: "separator" },
           { role: "quit", label: `Quitter ${appName}` }
         ]
       }
     ])
   );
+}
+
+function attachTextEditingShortcuts(window) {
+  window.webContents.on("before-input-event", (event, input) => {
+    if (!(input.meta || input.control) || input.alt || input.shift || input.type !== "keyDown") {
+      return;
+    }
+
+    const key = input.key.toLowerCase();
+
+    if (key === "c") {
+      event.preventDefault();
+      window.webContents.copy();
+      return;
+    }
+
+    if (key === "v") {
+      event.preventDefault();
+      window.webContents.paste();
+      return;
+    }
+
+    if (key === "x") {
+      event.preventDefault();
+      window.webContents.cut();
+      return;
+    }
+
+    if (key === "a") {
+      event.preventDefault();
+      window.webContents.selectAll();
+    }
+  });
 }
 
 function getSetupInitialValues() {
@@ -383,10 +404,10 @@ function buildSetupHtml() {
           :root {
             color-scheme: dark;
             --bg: #04101c;
-            --bg-soft: #0c1b2d;
-            --panel: rgba(8, 18, 31, 0.86);
+            --bg-soft: #07111f;
+            --panel: rgba(8, 18, 31, 0.9);
             --panel-strong: rgba(12, 28, 48, 0.94);
-            --line: rgba(141, 240, 204, 0.18);
+            --line: rgba(255, 255, 255, 0.12);
             --text: #edf4ff;
             --muted: #9fb2ca;
             --green: #10b981;
@@ -398,9 +419,7 @@ function buildSetupHtml() {
             min-height: 100vh;
             color: var(--text);
             background:
-              radial-gradient(circle at top left, rgba(247, 181, 0, 0.16), transparent 28%),
-              radial-gradient(circle at bottom right, rgba(141, 240, 204, 0.12), transparent 32%),
-              linear-gradient(135deg, rgba(3, 9, 17, 0.96), rgba(7, 17, 31, 0.98)),
+              linear-gradient(135deg, rgba(3, 9, 17, 0.98), rgba(5, 12, 22, 0.98)),
               var(--bg);
             font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
           }
@@ -416,7 +435,7 @@ function buildSetupHtml() {
             border: 1px solid var(--line);
             border-radius: 26px;
             background: var(--panel);
-            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
             padding: 24px;
             backdrop-filter: blur(16px);
           }
@@ -458,7 +477,7 @@ function buildSetupHtml() {
             outline: none;
           }
           input:focus {
-            border-color: rgba(141, 240, 204, 0.55);
+            border-color: rgba(16, 185, 129, 0.65);
           }
           .actions {
             display: flex;
@@ -630,6 +649,7 @@ function showSetupWindow(options = {}) {
       }
     });
 
+    attachTextEditingShortcuts(setupWindow);
     setupWindow.setMenuBarVisibility(false);
     setupWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(buildSetupHtml())}`);
     setupWindow.once("ready-to-show", () => {
