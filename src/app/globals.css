@@ -115,6 +115,10 @@ a {
   white-space: nowrap;
 }
 
+.mstv-control .mstv-source-tile {
+  border-width: 2px;
+}
+
 .mstv-desktop-control {
   font-size: 1.3rem;
 }
