@@ -1235,6 +1235,9 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           participant
         ])
       );
+      const liveGuestStatesById = new Map(
+        liveGuestStates.map((participant) => [participant.participantId, participant])
+      );
       const participantSource =
         liveGuestStates.length > 0
           ? liveGuestStates.map((participant, index) =>
@@ -1270,6 +1273,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             inProgram,
             selectionOrder: inProgram ? selectionOrder + 1 : null,
             effectiveReturnSource,
+            connectionQuality:
+              liveGuestStatesById.get(guest.participantId)?.connectionQuality ?? "unknown",
             returnSourceControlDisabled: inProgram,
             disconnectControlDisabled: inProgram,
             slideControlEnabled: slideControlEnabledGuestIds.includes(guest.participantId),
@@ -1743,7 +1748,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         : "border-transparent bg-slate-600 text-white",
       tileToneClassName: isActive
         ? "border-sky-500 bg-white/[0.06]"
-        : "border-slate-600/40 bg-white/[0.03] hover:border-slate-500/60 hover:bg-white/[0.05]"
+        : "border-slate-600 bg-white/[0.03] hover:border-slate-600 hover:bg-white/[0.05]"
     };
   }
 

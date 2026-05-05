@@ -34,6 +34,7 @@ export interface RuntimeParticipantState {
   surfaceRole: SurfaceRole;
   channel: SessionChannel | "unknown";
   controlRole?: ControlRole;
+  connectionQuality: "poor" | "good" | "excellent" | "lost" | "unknown";
   cameraPublished: boolean;
   microphonePublished: boolean;
   cameraTrackState: TrackRuntimeState;

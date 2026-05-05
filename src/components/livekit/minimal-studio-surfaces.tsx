@@ -11,7 +11,7 @@ import {
   VideoTrack,
   type TrackReference
 } from "@livekit/components-react";
-import { Room, RoomEvent, Track } from "livekit-client";
+import { ConnectionQuality, Room, RoomEvent, Track } from "livekit-client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseParticipantMetadata } from "@/lib/livekit/metadata";
 import { getIndicatorClasses, type MediaStatusIndicator } from "@/lib/studio/media-status";
@@ -67,6 +67,7 @@ interface ControlGuestGridSurfaceProps extends BaseSessionProps {
     cameraIndicator: MediaStatusIndicator;
     microphoneIndicator: MediaStatusIndicator;
     effectiveReturnSource: ReturnSource;
+    connectionQuality: RuntimeParticipantState["connectionQuality"];
     returnSourceControlDisabled: boolean;
     disconnectControlDisabled: boolean;
     slideControlEnabled: boolean;
@@ -121,6 +122,7 @@ function buildRemoteParticipantStates(remoteParticipants: ReturnType<typeof useR
       surfaceRole: metadata?.surfaceRole ?? "guest",
       channel: metadata?.channel ?? "unknown",
       controlRole: metadata?.controlRole ?? undefined,
+      connectionQuality: participant.connectionQuality,
       cameraPublished: Boolean(cameraTrack) && !(cameraTrack?.isMuted ?? false),
       microphonePublished: Boolean(microphoneTrack) && !(microphoneTrack?.isMuted ?? false),
       cameraTrackState: {
@@ -135,6 +137,51 @@ function buildRemoteParticipantStates(remoteParticipants: ReturnType<typeof useR
       }
     };
   });
+}
+
+function getConnectionQualityBarCount(quality: RuntimeParticipantState["connectionQuality"]) {
+  switch (quality) {
+    case ConnectionQuality.Excellent:
+      return 3;
+    case ConnectionQuality.Good:
+      return 2;
+    case ConnectionQuality.Poor:
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function ConnectionQualityIndicator({
+  quality
+}: {
+  quality: RuntimeParticipantState["connectionQuality"];
+}) {
+  const activeBars = getConnectionQualityBarCount(quality);
+  const activeClassName =
+    quality === ConnectionQuality.Poor
+      ? "bg-[#d4301f]"
+      : activeBars > 0
+        ? "bg-sky-500"
+        : "bg-slate-500";
+
+  return (
+    <div
+      className="flex h-8 items-end gap-1 rounded-full border border-transparent bg-slate-600 px-2 py-1.5 shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+      title={`Connection quality: ${quality}`}
+      aria-label={`Connection quality: ${quality}`}
+    >
+      {[1, 2, 3].map((bar) => (
+        <span
+          key={bar}
+          className={`w-1.5 rounded-full ${bar <= activeBars ? activeClassName : "bg-slate-400/35"}`}
+          style={{
+            height: `${bar * 5 + 3}px`
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 function getMediaCaptureErrorMessage(error: unknown) {
@@ -1157,6 +1204,8 @@ function ControlGuestGridContent({
   | "gridClassName"
 >) {
   const remoteParticipants = useRemoteParticipants();
+  const room = useRoomContext();
+  const [connectionQualityVersion, setConnectionQualityVersion] = useState(0);
   const videoTracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }]);
   const audioTracks = useTracks([{ source: Track.Source.Microphone, withPlaceholder: false }]);
   const concreteVideoTracks = videoTracks.filter(
@@ -1196,6 +1245,18 @@ function ControlGuestGridContent({
   const lastReportedLiveGuestsRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const handleConnectionQualityChanged = () => {
+      setConnectionQualityVersion((version) => version + 1);
+    };
+
+    room.on(RoomEvent.ConnectionQualityChanged, handleConnectionQualityChanged);
+
+    return () => {
+      room.off(RoomEvent.ConnectionQualityChanged, handleConnectionQualityChanged);
+    };
+  }, [room]);
+
+  useEffect(() => {
     if (!onPresentGuestIdsChange) {
       return;
     }
@@ -1227,7 +1288,7 @@ function ControlGuestGridContent({
 
     lastReportedLiveGuestsRef.current = signature;
     onLiveGuestStatesChange(liveGuestStates);
-  }, [onLiveGuestStatesChange, remoteParticipants]);
+  }, [connectionQualityVersion, onLiveGuestStatesChange, remoteParticipants]);
 
   if (guests.length === 0) {
     return (
@@ -1279,7 +1340,7 @@ function ControlGuestGridContent({
             className={`mstv-source-tile group overflow-hidden rounded-[24px] border text-left transition ${
               guest.inProgram
                 ? "border-emerald-500 bg-white/[0.06]"
-                : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+                : "border-slate-600 bg-white/[0.03] hover:border-slate-600 hover:bg-white/[0.05]"
             } ${selectionLimitReached ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
           >
             <div
@@ -1331,10 +1392,17 @@ function ControlGuestGridContent({
               </div>
 
               {guest.selectionOrder ? (
-                <div className="mstv-ui-badge pointer-events-none absolute right-4 top-4 z-20 border border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
-                  {guest.selectionOrder}
+                <div className="pointer-events-none absolute right-4 top-4 z-20 flex flex-col items-end gap-2">
+                  <ConnectionQualityIndicator quality={guest.connectionQuality} />
+                  <div className="mstv-ui-badge border border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
+                    {guest.selectionOrder}
+                  </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="pointer-events-none absolute right-4 top-4 z-20">
+                  <ConnectionQualityIndicator quality={guest.connectionQuality} />
+                </div>
+              )}
 
               <div className="absolute bottom-0 left-0 right-0 z-20 flex items-end gap-3 p-4">
                 <div className="w-[30%] min-w-0 max-w-[11rem] shrink-0">
