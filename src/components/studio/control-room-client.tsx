@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ControlGuestGridSurface,
   ControlProgramRoutingBridge,
@@ -173,6 +173,13 @@ function useStudioInputPreview(videoDeviceId: string | null, enabled: boolean) {
   };
 }
 
+function isAcceptedImageFile(file: File) {
+  const acceptedMimeTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+  const acceptedExtensions = /\.(png|jpe?g|webp)$/i;
+
+  return acceptedMimeTypes.has(file.type) || acceptedExtensions.test(file.name);
+}
+
 function StudioInputTile(input: {
   label: string;
   isActive: boolean;
@@ -194,6 +201,7 @@ function StudioInputTile(input: {
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [previewVideoReady, setPreviewVideoReady] = useState(false);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
   const hasPreviewTrack = (input.previewStream?.getVideoTracks().length ?? 0) > 0;
   const hasPreviewVideo = hasPreviewTrack && previewVideoReady;
   const isImageTile = input.label === "IMAGE";
@@ -231,18 +239,76 @@ function StudioInputTile(input: {
     };
   }, [input.previewStream]);
 
+  const handleImageDragEnter = (event: DragEvent<HTMLElement>) => {
+    if (!isImageTile) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingImage(true);
+  };
+
+  const handleImageDragOver = (event: DragEvent<HTMLElement>) => {
+    if (!isImageTile) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+    setIsDraggingImage(true);
+  };
+
+  const handleImageDragLeave = (event: DragEvent<HTMLElement>) => {
+    if (!isImageTile) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsDraggingImage(false);
+    }
+  };
+
+  const handleImageDrop = (event: DragEvent<HTMLElement>) => {
+    if (!isImageTile) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingImage(false);
+
+    const droppedFile = Array.from(event.dataTransfer.files).find(isAcceptedImageFile);
+
+    if (!droppedFile) {
+      return;
+    }
+
+    input.onSelectImageFile?.(droppedFile);
+  };
+
   return (
     <section
       role="button"
       tabIndex={0}
       onClick={input.onActivate}
+      onDragEnter={handleImageDragEnter}
+      onDragOver={handleImageDragOver}
+      onDragLeave={handleImageDragLeave}
+      onDrop={handleImageDrop}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           input.onActivate();
         }
       }}
-      className={`mstv-source-tile overflow-hidden rounded-[24px] border bg-white/[0.03] transition ${input.tileToneClassName}`}
+      className={`mstv-source-tile overflow-hidden rounded-[24px] border bg-white/[0.03] transition ${
+        isDraggingImage ? "border-sky-300/80 bg-sky-500/10" : input.tileToneClassName
+      }`}
     >
       <div className="relative aspect-video bg-black">
         <video
@@ -277,6 +343,14 @@ function StudioInputTile(input: {
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
+        {isImageTile && isDraggingImage ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center border-2 border-dashed border-sky-200/80 bg-sky-500/15">
+            <span className="mstv-ui-badge border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
+              Glissez une image ici
+            </span>
+          </div>
+        ) : null}
+
         <div className="absolute left-4 top-4 flex flex-wrap gap-2">
           <div
             className={`mstv-ui-badge border shadow-[0_2px_10px_rgba(0,0,0,0.35)] ${input.statusToneClassName}`}
@@ -301,12 +375,16 @@ function StudioInputTile(input: {
               </span>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
                 className="hidden"
                 onClick={(event) => event.stopPropagation()}
                 onChange={(event) => {
                   event.stopPropagation();
-                  input.onSelectImageFile?.(event.target.files?.[0] ?? null);
+                  const selectedFile = event.target.files?.[0] ?? null;
+
+                  input.onSelectImageFile?.(
+                    selectedFile && isAcceptedImageFile(selectedFile) ? selectedFile : null
+                  );
                   event.currentTarget.value = "";
                 }}
               />
