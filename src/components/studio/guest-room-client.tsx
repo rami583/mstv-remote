@@ -416,6 +416,14 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
         detail: "MUTED_REGIE",
         description: "Not selected in Program."
       };
+  const guestInactiveBadgeStyle =
+    guestProgramStatusIndicator.tone === "red"
+      ? {
+          backgroundColor: "#d4301f",
+          borderColor: "transparent",
+          color: "#ffffff"
+        }
+      : undefined;
 
   function handleSlideCommand(command: SlideControlCommandType) {
     if (!slideControlAuthorized) {
@@ -645,11 +653,13 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               <div className="absolute left-2 top-2 z-20 flex gap-1.5">
                 <div
                   className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
+                  style={guestInactiveBadgeStyle}
                 >
                   Mic
                 </div>
                 <div
                   className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
+                  style={guestInactiveBadgeStyle}
                 >
                   Cam
                 </div>

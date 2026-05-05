@@ -111,7 +111,7 @@ export function getIndicatorClasses(tone: MediaStatusIndicator["tone"]) {
     case "green":
       return "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
     case "red":
-      return "border-transparent bg-tally text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
+      return "border-transparent bg-[#d4301f] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
     case "orange":
       return "border-transparent bg-amber-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
   }

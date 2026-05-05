@@ -21,6 +21,8 @@ const CONTROL_TILE_WIDTH = 507;
 const CONTROL_TILE_GAP = 16;
 const CONTROL_PAGE_HORIZONTAL_PADDING = 64;
 const CONTROL_WINDOW_WIDTH = CONTROL_TILE_WIDTH * 3 + CONTROL_TILE_GAP * 2 + CONTROL_PAGE_HORIZONTAL_PADDING;
+const CONTROL_WINDOW_HEIGHT = 1080;
+const CONTROL_WINDOW_MIN_HEIGHT = 960;
 const SLIDE_RECEIVER_TIMEOUT_MS = 10_000;
 
 let nextServerProcess = null;
@@ -769,13 +771,15 @@ async function loadWindow(window, label, url) {
 async function createControlWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const fixedWidth = Math.min(CONTROL_WINDOW_WIDTH, primaryDisplay.workArea.width);
-  const bounds = centeredBounds(primaryDisplay, fixedWidth, 900);
+  const controlHeight = Math.min(CONTROL_WINDOW_HEIGHT, primaryDisplay.workArea.height);
+  const controlMinHeight = Math.min(CONTROL_WINDOW_MIN_HEIGHT, controlHeight);
+  const bounds = centeredBounds(primaryDisplay, fixedWidth, controlHeight);
 
   controlWindow = new BrowserWindow({
     ...bounds,
     minWidth: fixedWidth,
     maxWidth: fixedWidth,
-    minHeight: 720,
+    minHeight: controlMinHeight,
     title: "MSTV Visio",
     backgroundColor: "#000000",
     webPreferences: {

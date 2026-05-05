@@ -12,7 +12,7 @@ const config: Config = {
         ink: "#07111f",
         steel: "#102339",
         signal: "#f7b500",
-        tally: "#ff5a36",
+        tally: "#d4301f",
         air: "#8df0cc"
       },
       boxShadow: {
