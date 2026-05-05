@@ -1946,13 +1946,27 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               onClick={() => {
                 void handleToggleProgramWindow();
               }}
-              className={`mstv-ui-button ml-auto border transition ${
+              className={`mstv-ui-button ml-auto inline-flex items-center gap-2 border transition ${
                 isProgramWindowOpen
                   ? "border-air/30 bg-air/10 text-air hover:bg-air/15"
                   : "border-white/10 bg-white/10 text-slate-300 hover:border-white/20 hover:text-white"
               }`}
             >
-              Program
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+              >
+                <rect x="3" y="4" width="18" height="12" rx="2" />
+                <path d="M8 20h8" />
+                <path d="M12 16v4" />
+              </svg>
+              <span>Diffuser</span>
             </button>
           </div>
         ) : (
