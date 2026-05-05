@@ -583,10 +583,15 @@ function getSingleEffectiveReturnSource(input: {
       guestReturnOverrides: input.snapshot!.guestReturnOverrides
     })
   );
-  const [firstSource] = effectiveSources;
+const [firstSource] = effectiveSources;
 
   return effectiveSources.every((source) => source === firstSource) ? firstSource : null;
 }
+
+const topPanelClassName =
+  "rounded-[18px] border border-white/[0.08] bg-black/60 px-4 py-3 text-sm text-slate-300 backdrop-blur-md";
+const defaultSlideReceiverHost = "slides.local";
+const defaultSlideReceiverPort = "4317";
 
 function buildParticipantStateFromLiveKit(
   participant: RuntimeParticipantState,
@@ -756,8 +761,9 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [isProgramWindowOpen, setIsProgramWindowOpen] = useState(false);
   const [guestLinkCopied, setGuestLinkCopied] = useState(false);
   const [sessionSlugDraft, setSessionSlugDraft] = useState(room || "studio");
-  const [slideReceiverHost, setSlideReceiverHost] = useState("");
-  const [slideReceiverPort, setSlideReceiverPort] = useState("4317");
+  const [slideReceiverHost, setSlideReceiverHost] = useState(defaultSlideReceiverHost);
+  const [slideReceiverPort, setSlideReceiverPort] = useState(defaultSlideReceiverPort);
+  const [slideReceiverSettingsLoaded, setSlideReceiverSettingsLoaded] = useState(false);
   const [slideReceiverStatus, setSlideReceiverStatus] = useState<SlideReceiverStatus>({
     state: "idle",
     message: "Receiver non configuré"
@@ -1007,27 +1013,31 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     const savedPort = window.localStorage.getItem("mstv.slideReceiverPort");
     const savedProgramAudioOutput = window.localStorage.getItem("mstv.programAudioOutputDeviceId");
 
-    if (savedHost) {
-      setSlideReceiverHost(savedHost);
-    }
-
-    if (savedPort) {
-      setSlideReceiverPort(savedPort);
-    }
+    setSlideReceiverHost(savedHost?.trim() ? savedHost : defaultSlideReceiverHost);
+    setSlideReceiverPort(savedPort?.trim() ? savedPort : defaultSlideReceiverPort);
 
     if (savedProgramAudioOutput) {
       setProgramAudioOutputDeviceId(savedProgramAudioOutput);
     }
 
+    setSlideReceiverSettingsLoaded(true);
   }, []);
 
   useEffect(() => {
+    if (!slideReceiverSettingsLoaded) {
+      return;
+    }
+
     window.localStorage.setItem("mstv.slideReceiverHost", slideReceiverHost);
-  }, [slideReceiverHost]);
+  }, [slideReceiverHost, slideReceiverSettingsLoaded]);
 
   useEffect(() => {
+    if (!slideReceiverSettingsLoaded) {
+      return;
+    }
+
     window.localStorage.setItem("mstv.slideReceiverPort", slideReceiverPort);
-  }, [slideReceiverPort]);
+  }, [slideReceiverPort, slideReceiverSettingsLoaded]);
 
   useEffect(() => {
     window.localStorage.setItem("mstv.programAudioOutputDeviceId", programAudioOutputDeviceId);
@@ -1832,10 +1842,11 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
   return (
     <main
-      className={`mstv-control min-h-screen bg-black px-4 py-4 text-white md:px-6 md:py-6 ${
+      className={`mstv-control min-h-screen bg-black text-white ${
         isDesktopRuntime ? "mstv-desktop-control" : ""
       }`}
     >
+      <div className="bg-[#333333] px-4 py-4 md:px-6 md:py-6">
       <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4">
         {error ? (
           <div className="rounded-[18px] border border-tally/30 bg-tally/10 px-4 py-3 text-sm text-tally">
@@ -1844,7 +1855,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         ) : null}
 
         {desktopConfig ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+          <div className={`flex flex-wrap items-center gap-3 ${topPanelClassName}`}>
             <span className="mstv-ui-label">
               Lien invité
             </span>
@@ -1888,7 +1899,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         ) : null}
 
         {isDesktopRuntime ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+          <div className={`flex flex-wrap items-center gap-3 ${topPanelClassName}`}>
             <label className="mstv-ui-field w-[320px] max-w-full gap-3 border border-white/10 bg-black">
               <span className="mstv-ui-label shrink-0">
                 Video Program
@@ -1945,7 +1956,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             </button>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+          <div className={`flex flex-wrap items-center gap-3 ${topPanelClassName}`}>
             <span className="mstv-ui-label">
               Audio Program
             </span>
@@ -1964,7 +1975,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           </div>
         )}
 
-        <details className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+        <details className={topPanelClassName}>
           <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3">
             <span className="mstv-ui-label">
               Réglages slides
@@ -1988,7 +1999,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             <input
               value={slideReceiverHost}
               onChange={(event) => setSlideReceiverHost(event.target.value)}
-              placeholder="mac-slides.local"
+              placeholder="slides.local"
               className="mstv-ui-field min-w-[220px] flex-1 border border-white/10 bg-black text-white outline-none placeholder:text-slate-600"
             />
             <input
@@ -2007,74 +2018,79 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         </details>
 
         <div className={controlTileGridClassName}>
-          <StudioInputTile
-            label={studioInputs.STUDIO.label}
-            isActive={visuallyActiveReturnSource === "STUDIO"}
-            onActivate={() => {
-              void handleSelectGlobalReturnSource("STUDIO");
-            }}
-            previewStream={returnPreviewStreams.STUDIO}
-            statusToneClassName={studioInputStatuses.STUDIO.toneClassName}
-            tileToneClassName={studioInputStatuses.STUDIO.tileToneClassName}
-            error={returnFeedPublisherStates.STUDIO.error}
-            inputsEnabled={returnInputsEnabled}
-            videoInputs={videoInputs}
-            audioInputs={audioInputs}
-            selectedVideoInputId={studioInputs.STUDIO.videoDeviceId}
-            selectedAudioInputId={studioInputs.STUDIO.audioDeviceId}
-            onSelectVideoInput={(value) => {
-              updateStudioInputDevice("STUDIO", "videoDeviceId", value);
-            }}
-            onSelectAudioInput={(value) => {
-              updateStudioInputDevice("STUDIO", "audioDeviceId", value);
-            }}
-          />
-          <StudioInputTile
-            label={studioInputs.REGIE.label}
-            isActive={visuallyActiveReturnSource === "REGIE"}
-            onActivate={() => {
-              void handleSelectGlobalReturnSource("REGIE");
-            }}
-            previewStream={returnPreviewStreams.REGIE}
-            statusToneClassName={studioInputStatuses.REGIE.toneClassName}
-            tileToneClassName={studioInputStatuses.REGIE.tileToneClassName}
-            error={returnFeedPublisherStates.REGIE.error}
-            inputsEnabled={returnInputsEnabled}
-            videoInputs={videoInputs}
-            audioInputs={audioInputs}
-            selectedVideoInputId={studioInputs.REGIE.videoDeviceId}
-            selectedAudioInputId={studioInputs.REGIE.audioDeviceId}
-            onSelectVideoInput={(value) => {
-              updateStudioInputDevice("REGIE", "videoDeviceId", value);
-            }}
-            onSelectAudioInput={(value) => {
-              updateStudioInputDevice("REGIE", "audioDeviceId", value);
-            }}
-          />
-          <StudioInputTile
-            label={studioInputs.IMAGE.label}
-            isActive={visuallyActiveReturnSource === "IMAGE"}
-            onActivate={() => {
-              void handleSelectGlobalReturnSource("IMAGE");
-            }}
-            previewStream={null}
-            previewImageSrc={studioInputs.IMAGE.imageDataUrl ?? null}
-            statusToneClassName={studioInputStatuses.IMAGE.toneClassName}
-            tileToneClassName={studioInputStatuses.IMAGE.tileToneClassName}
-            error={null}
-            inputsEnabled={returnInputsEnabled}
-            videoInputs={videoInputs}
-            audioInputs={audioInputs}
-            selectedVideoInputId={null}
-            selectedAudioInputId={null}
-            imageFileName={studioInputs.IMAGE.imageFileName ?? null}
-            onSelectVideoInput={() => undefined}
-            onSelectAudioInput={() => undefined}
-            onSelectImageFile={(file) => {
-              void handleSelectImageInput(file);
-            }}
-          />
+            <StudioInputTile
+              label={studioInputs.STUDIO.label}
+              isActive={visuallyActiveReturnSource === "STUDIO"}
+              onActivate={() => {
+                void handleSelectGlobalReturnSource("STUDIO");
+              }}
+              previewStream={returnPreviewStreams.STUDIO}
+              statusToneClassName={studioInputStatuses.STUDIO.toneClassName}
+              tileToneClassName={studioInputStatuses.STUDIO.tileToneClassName}
+              error={returnFeedPublisherStates.STUDIO.error}
+              inputsEnabled={returnInputsEnabled}
+              videoInputs={videoInputs}
+              audioInputs={audioInputs}
+              selectedVideoInputId={studioInputs.STUDIO.videoDeviceId}
+              selectedAudioInputId={studioInputs.STUDIO.audioDeviceId}
+              onSelectVideoInput={(value) => {
+                updateStudioInputDevice("STUDIO", "videoDeviceId", value);
+              }}
+              onSelectAudioInput={(value) => {
+                updateStudioInputDevice("STUDIO", "audioDeviceId", value);
+              }}
+            />
+            <StudioInputTile
+              label={studioInputs.REGIE.label}
+              isActive={visuallyActiveReturnSource === "REGIE"}
+              onActivate={() => {
+                void handleSelectGlobalReturnSource("REGIE");
+              }}
+              previewStream={returnPreviewStreams.REGIE}
+              statusToneClassName={studioInputStatuses.REGIE.toneClassName}
+              tileToneClassName={studioInputStatuses.REGIE.tileToneClassName}
+              error={returnFeedPublisherStates.REGIE.error}
+              inputsEnabled={returnInputsEnabled}
+              videoInputs={videoInputs}
+              audioInputs={audioInputs}
+              selectedVideoInputId={studioInputs.REGIE.videoDeviceId}
+              selectedAudioInputId={studioInputs.REGIE.audioDeviceId}
+              onSelectVideoInput={(value) => {
+                updateStudioInputDevice("REGIE", "videoDeviceId", value);
+              }}
+              onSelectAudioInput={(value) => {
+                updateStudioInputDevice("REGIE", "audioDeviceId", value);
+              }}
+            />
+            <StudioInputTile
+              label={studioInputs.IMAGE.label}
+              isActive={visuallyActiveReturnSource === "IMAGE"}
+              onActivate={() => {
+                void handleSelectGlobalReturnSource("IMAGE");
+              }}
+              previewStream={null}
+              previewImageSrc={studioInputs.IMAGE.imageDataUrl ?? null}
+              statusToneClassName={studioInputStatuses.IMAGE.toneClassName}
+              tileToneClassName={studioInputStatuses.IMAGE.tileToneClassName}
+              error={null}
+              inputsEnabled={returnInputsEnabled}
+              videoInputs={videoInputs}
+              audioInputs={audioInputs}
+              selectedVideoInputId={null}
+              selectedAudioInputId={null}
+              imageFileName={studioInputs.IMAGE.imageFileName ?? null}
+              onSelectVideoInput={() => undefined}
+              onSelectAudioInput={() => undefined}
+              onSelectImageFile={(file) => {
+                void handleSelectImageInput(file);
+              }}
+            />
+          </div>
         </div>
+      </div>
+
+      <div className="px-4 py-4 md:px-6 md:py-6">
+      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4">
 
         <ControlGuestGridSurface
           session={session}
@@ -2132,6 +2148,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           onPreviewStreamChange={(stream) => updateReturnPreviewStream("IMAGE", stream)}
           onDebugStateChange={(state) => updateReturnFeedDebugState("IMAGE", state)}
         />
+      </div>
       </div>
     </main>
   );
