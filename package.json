@@ -52,6 +52,7 @@
       "desktop/main.cjs",
       "desktop/preload.cjs",
       "desktop/setup-preload.cjs",
+      "desktop/setup.html",
       "package.json"
     ],
     "extraResources": [

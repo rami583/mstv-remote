@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Configuration MSTV Visio</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #04101c;
+        --panel: rgba(8, 18, 31, 0.88);
+        --line: rgba(141, 240, 204, 0.18);
+        --text: #edf4ff;
+        --muted: #9fb2ca;
+        --green: #10b981;
+        --red: #ff5a36;
+        --button-height: 36px;
+        --button-padding-x: 14px;
+        --button-font-size: 12px;
+        --button-font-weight: 600;
+        --button-radius: 999px;
+        --label-font-size: 12px;
+        --label-letter-spacing: 0.12em;
+        font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+      }
+
+      body {
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      main {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: 18px;
+      }
+
+      form {
+        width: min(100%, 700px);
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        background: var(--panel);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+        padding: 24px;
+        backdrop-filter: blur(16px);
+      }
+
+      h1 {
+        margin: 0;
+        color: var(--text);
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: -0.03em;
+      }
+
+      p {
+        margin: 10px 0 18px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        color: var(--muted);
+        font-size: var(--label-font-size);
+        font-weight: 600;
+        letter-spacing: var(--label-letter-spacing);
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      input {
+        appearance: none;
+        width: 100%;
+        height: 40px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: var(--button-radius);
+        background: rgba(0, 0, 0, 0.5);
+        color: var(--text);
+        font-size: 15px;
+        font-weight: 600;
+        padding: 0 16px;
+        outline: none;
+      }
+
+      input:focus {
+        border-color: rgba(16, 185, 129, 0.7);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+      }
+
+      input::selection {
+        background: rgba(16, 185, 129, 0.35);
+      }
+
+      input:-webkit-autofill,
+      input:-webkit-autofill:hover,
+      input:-webkit-autofill:focus {
+        -webkit-text-fill-color: var(--text);
+        caret-color: var(--text);
+        box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5) inset;
+        transition: background-color 9999s ease-out;
+      }
+
+      .hint {
+        margin: 14px 0 0;
+        color: rgba(159, 178, 202, 0.78);
+        font-size: 12px;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-top: 20px;
+      }
+
+      .status {
+        min-height: 18px;
+        color: #ffb7a6;
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      button {
+        appearance: none;
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: var(--button-radius);
+        background: var(--green);
+        height: var(--button-height);
+        padding: 0 var(--button-padding-x);
+        color: white;
+        font-size: var(--button-font-size);
+        font-weight: var(--button-font-weight);
+        letter-spacing: 0.08em;
+        line-height: 1;
+        text-transform: uppercase;
+        transition:
+          filter 160ms ease,
+          transform 160ms ease;
+      }
+
+      button:hover {
+        filter: brightness(1.08);
+      }
+
+      button:disabled {
+        cursor: default;
+        opacity: 0.6;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <form id="setup-form">
+        <h1>Configuration MSTV Visio</h1>
+        <p>Entrez les paramètres LiveKit et le lien public invité. Ils seront enregistrés localement sur ce Mac.</p>
+
+        <div class="grid">
+          <label>
+            LIVEKIT URL
+            <input id="LIVEKIT_URL" autocomplete="off" placeholder="wss://..." />
+          </label>
+          <label>
+            LIVEKIT API KEY
+            <input id="LIVEKIT_API_KEY" autocomplete="off" />
+          </label>
+          <label>
+            LIVEKIT API SECRET
+            <input id="LIVEKIT_API_SECRET" type="password" autocomplete="off" />
+          </label>
+          <label>
+            Session par défaut
+            <input id="MSTV_DESKTOP_ROOM" autocomplete="off" />
+          </label>
+          <label>
+            Lien public invités
+            <input id="GUEST_PUBLIC_BASE_URL" autocomplete="off" placeholder="https://visio.monstudiotv.com" />
+          </label>
+        </div>
+
+        <p class="hint">Les secrets ne sont pas intégrés dans l’app. Ils sont stockés localement dans Application Support sur ce Mac.</p>
+
+        <div class="actions">
+          <div id="status" class="status"></div>
+          <button id="save-button" type="submit">Enregistrer</button>
+        </div>
+      </form>
+    </main>
+
+    <script>
+      const form = document.getElementById("setup-form");
+      const saveButton = document.getElementById("save-button");
+      const status = document.getElementById("status");
+      const fields = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "MSTV_DESKTOP_ROOM", "GUEST_PUBLIC_BASE_URL"];
+
+      async function loadInitialValues() {
+        const setupStatus = await window.mstvSetup.getStatus();
+
+        for (const field of fields) {
+          document.getElementById(field).value = setupStatus.values?.[field] || "";
+        }
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        status.textContent = "";
+        saveButton.disabled = true;
+
+        const config = Object.fromEntries(fields.map((field) => [field, document.getElementById(field).value]));
+
+        try {
+          await window.mstvSetup.save(config);
+          status.style.color = "#8df0cc";
+          status.textContent = "Configuration enregistrée. Ouverture de MSTV Visio...";
+        } catch (error) {
+          status.style.color = "#ffb7a6";
+          status.textContent = error instanceof Error ? error.message : String(error);
+          saveButton.disabled = false;
+        }
+      });
+
+      loadInitialValues().catch((error) => {
+        status.textContent = error instanceof Error ? error.message : String(error);
+      });
+    </script>
+  </body>
+</html>
