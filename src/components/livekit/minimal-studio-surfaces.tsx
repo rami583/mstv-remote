@@ -1259,11 +1259,8 @@ function ControlGuestGridContent({
         {guests.map((guest) => {
         const trackRef = participantTrackMap.get(guest.participantId);
         const selectionLimitReached = !guest.inProgram && guests.filter((item) => item.inProgram).length >= 3;
-        const sourcePillClassNames: Record<ReturnSource, string> = {
-          STUDIO: "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
-          REGIE: "border-transparent bg-amber-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
-          IMAGE: "border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
-        };
+        const activeActionPillClassName =
+          "border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
         const pillBaseClassName =
           "mstv-ui-pill border";
         const neutralPillClassName =
@@ -1365,7 +1362,7 @@ function ControlGuestGridContent({
                               onSelectGuestReturnSource?.(guest.participantId, source);
                             }}
                             className={`${pillBaseClassName} transition ${
-                              isActive ? sourcePillClassNames[source] : neutralPillClassName
+                              isActive ? activeActionPillClassName : neutralPillClassName
                             } ${
                               guest.returnSourceControlDisabled ? "cursor-default opacity-90" : ""
                             }`}
@@ -1384,7 +1381,7 @@ function ControlGuestGridContent({
                         }}
                         className={`${pillBaseClassName} transition ${
                           guest.slideControlEnabled
-                            ? "border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+                            ? activeActionPillClassName
                             : neutralPillClassName
                         }`}
                       >
