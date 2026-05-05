@@ -1742,7 +1742,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         ? "border-transparent bg-sky-500 text-white"
         : "border-transparent bg-slate-600 text-white",
       tileToneClassName: isActive
-        ? "border-sky-500/60 bg-white/[0.06]"
+        ? "border-sky-500 bg-white/[0.06]"
         : "border-slate-600/40 bg-white/[0.03] hover:border-slate-500/60 hover:bg-white/[0.05]"
     };
   }
