@@ -682,6 +682,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [productionSnapshot, setProductionSnapshot] = useState<ProductionSnapshot | null>(null);
   const [programGuestIds, setProgramGuestIds] = useState<string[]>([]);
   const [programMutedGuestIds, setProgramMutedGuestIds] = useState<string[]>([]);
+  const [pipModeEnabled, setPipModeEnabled] = useState(false);
   const [slideControlEnabledGuestIds, setSlideControlEnabledGuestIds] = useState<string[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceOption[]>([]);
   const [audioInputs, setAudioInputs] = useState<MediaDeviceOption[]>([]);
@@ -971,11 +972,18 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           return;
         }
 
+        const nextProgramGuestIds = pipModeEnabled
+          ? snapshot.programGuestIds.slice(0, 3)
+          : snapshot.programGuestIds.slice(0, 1);
+
         setProductionSnapshot(snapshot);
         setProgramGuestIds((current) => {
-          const next = snapshot.programGuestIds.slice(0, 3);
-          return areGuestListsEqual(current, next) ? current : next;
+          return areGuestListsEqual(current, nextProgramGuestIds) ? current : nextProgramGuestIds;
         });
+
+        if (!pipModeEnabled && snapshot.programGuestIds.length > 1) {
+          await updateProgramScene(room, nextProgramGuestIds);
+        }
       } catch (snapshotError) {
         if (!active) {
           return;
@@ -999,7 +1007,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       active = false;
       window.clearInterval(interval);
     };
-  }, [room]);
+  }, [pipModeEnabled, room]);
 
   useEffect(() => {
     setIsDesktopRuntime(
@@ -1444,11 +1452,15 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     const previousSelection = programGuestIds;
     const previousSnapshot = productionSnapshot;
     const previousProgramMutedGuestIds = programMutedGuestIds;
-    const nextSelection = programGuestIds.includes(participantId)
-      ? programGuestIds.filter((id) => id !== participantId)
-      : programGuestIds.length < 3
-        ? [...programGuestIds, participantId]
-        : programGuestIds;
+    const nextSelection = pipModeEnabled
+      ? programGuestIds.includes(participantId)
+        ? programGuestIds.filter((id) => id !== participantId)
+        : programGuestIds.length < 3
+          ? [...programGuestIds, participantId]
+          : programGuestIds
+      : programGuestIds.includes(participantId)
+        ? []
+        : [participantId];
 
     if (areGuestListsEqual(programGuestIds, nextSelection)) {
       return;
@@ -1472,6 +1484,47 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       await updateProgramScene(room, nextSelection);
       setError(null);
     } catch (updateError) {
+      setProgramGuestIds(previousSelection);
+      setProgramMutedGuestIds(previousProgramMutedGuestIds);
+      setProductionSnapshot(previousSnapshot);
+      setError(
+        updateError instanceof Error ? updateError.message : "Unable to update the program scene."
+      );
+    }
+  }
+
+  async function handleTogglePipMode() {
+    const nextPipModeEnabled = !pipModeEnabled;
+    setPipModeEnabled(nextPipModeEnabled);
+
+    if (nextPipModeEnabled || programGuestIds.length <= 1) {
+      return;
+    }
+
+    const previousSelection = programGuestIds;
+    const previousSnapshot = productionSnapshot;
+    const previousProgramMutedGuestIds = programMutedGuestIds;
+    const nextSelection = programGuestIds.slice(0, 1);
+
+    setProgramGuestIds(nextSelection);
+    setProgramMutedGuestIds((current) =>
+      current.filter((participantId) => nextSelection.includes(participantId))
+    );
+    updateLocalProductionSnapshot((snapshot) => ({
+      ...snapshot,
+      programGuestIds: nextSelection,
+      guestReturnOverrides: sanitizeOverridesForProgramGuests(
+        snapshot.guestReturnOverrides,
+        nextSelection,
+        snapshot.globalReturnSource
+      )
+    }));
+
+    try {
+      await updateProgramScene(room, nextSelection);
+      setError(null);
+    } catch (updateError) {
+      setPipModeEnabled(true);
       setProgramGuestIds(previousSelection);
       setProgramMutedGuestIds(previousProgramMutedGuestIds);
       setProductionSnapshot(previousSnapshot);
@@ -1942,12 +1995,27 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
                 Sélection de sortie audio indisponible sur ce runtime.
               </span>
             ) : null}
+            <div className="ml-auto flex items-center gap-3">
+              <button
+                type="button"
+                aria-pressed={pipModeEnabled}
+                onClick={() => {
+                  void handleTogglePipMode();
+                }}
+                className={`mstv-ui-button border transition ${
+                  pipModeEnabled
+                    ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-400"
+                    : "border-white/10 bg-white/10 text-slate-300 hover:border-white/20 hover:text-white"
+                }`}
+              >
+                PIP
+              </button>
             <button
               type="button"
               onClick={() => {
                 void handleToggleProgramWindow();
               }}
-              className={`mstv-ui-button ml-auto inline-flex items-center gap-2 border transition ${
+              className={`mstv-ui-button inline-flex items-center gap-2 border transition ${
                 isProgramWindowOpen
                   ? "border-air/30 bg-air/10 text-air hover:bg-air/15"
                   : "border-white/10 bg-white/10 text-slate-300 hover:border-white/20 hover:text-white"
@@ -1969,6 +2037,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               </svg>
               <span>Diffuser</span>
             </button>
+            </div>
           </div>
         ) : (
           <div className={`flex flex-wrap items-center gap-3 ${topPanelClassName}`}>
@@ -1987,6 +2056,20 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              aria-pressed={pipModeEnabled}
+              onClick={() => {
+                void handleTogglePipMode();
+              }}
+              className={`mstv-ui-button ml-auto border transition ${
+                pipModeEnabled
+                  ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-400"
+                  : "border-white/10 bg-white/10 text-slate-300 hover:border-white/20 hover:text-white"
+              }`}
+            >
+              PIP
+            </button>
           </div>
         )}
 
