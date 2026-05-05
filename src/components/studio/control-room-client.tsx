@@ -1181,38 +1181,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
   const globalReturnSource = productionSnapshot?.globalReturnSource ?? "STUDIO";
   const guestReturnOverrides = productionSnapshot?.guestReturnOverrides ?? {};
-  const singleEffectiveReturnSource = useMemo(
-    () => {
-      if (liveGuestStates.length > 0) {
-        const effectiveSources = liveGuestStates.map((guest) =>
-          getEffectiveReturnSource({
-            guestId: guest.participantId,
-            programGuestIds,
-            globalReturnSource,
-            guestReturnOverrides
-          })
-        );
-        const [firstSource] = effectiveSources;
-
-        return effectiveSources.every((source) => source === firstSource) ? firstSource : null;
-      }
-
-      return getSingleEffectiveReturnSource({
-        snapshot: productionSnapshot,
-        programGuestIds,
-        presentGuestIds
-      });
-    },
-    [
-      globalReturnSource,
-      guestReturnOverrides,
-      liveGuestStates,
-      presentGuestIds,
-      productionSnapshot,
-      programGuestIds
-    ]
-  );
-
   const updateLocalProductionSnapshot = useCallback(
     (updater: (snapshot: ProductionSnapshot) => ProductionSnapshot) => {
       setProductionSnapshot((current) =>
@@ -1300,7 +1268,10 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       slideControlEnabledGuestIds
     ]
   );
-  const visuallyActiveReturnSource = singleEffectiveReturnSource ?? (guests.length === 0 ? globalReturnSource : null);
+  const visuallyActiveReturnSources = useMemo(
+    () => new Set<ReturnSource>(guests.map((guest) => guest.effectiveReturnSource)),
+    [guests]
+  );
   const studioInputStatuses = {
     STUDIO: getStudioInputStatus("STUDIO"),
     REGIE: getStudioInputStatus("REGIE"),
@@ -1740,7 +1711,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }
 
   function getStudioInputStatus(inputId: ReturnSource) {
-    const isActive = inputId === visuallyActiveReturnSource;
+    const isActive = visuallyActiveReturnSources.has(inputId);
 
     return {
       toneClassName: isActive
@@ -2031,7 +2002,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         <div className={controlTileGridClassName}>
             <StudioInputTile
               label={studioInputs.STUDIO.label}
-              isActive={visuallyActiveReturnSource === "STUDIO"}
+              isActive={visuallyActiveReturnSources.has("STUDIO")}
               onActivate={() => {
                 void handleSelectGlobalReturnSource("STUDIO");
               }}
@@ -2053,7 +2024,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             />
             <StudioInputTile
               label={studioInputs.REGIE.label}
-              isActive={visuallyActiveReturnSource === "REGIE"}
+              isActive={visuallyActiveReturnSources.has("REGIE")}
               onActivate={() => {
                 void handleSelectGlobalReturnSource("REGIE");
               }}
@@ -2075,7 +2046,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             />
             <StudioInputTile
               label={studioInputs.IMAGE.label}
-              isActive={visuallyActiveReturnSource === "IMAGE"}
+              isActive={visuallyActiveReturnSources.has("IMAGE")}
               onActivate={() => {
                 void handleSelectGlobalReturnSource("IMAGE");
               }}
