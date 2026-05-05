@@ -663,6 +663,15 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                 >
                   Cam
                 </div>
+                <div
+                  className="rounded-full border border-transparent px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em]"
+                  style={{
+                    backgroundColor: "#d4301f",
+                    color: "#ffffff"
+                  }}
+                >
+                  RED TEST #d4301f
+                </div>
               </div>
             </div>
           </div>
