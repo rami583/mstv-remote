@@ -1,5 +1,4 @@
-const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, screen, session, shell, systemPreferences } = require("electron");
-const { spawn } = require("node:child_process");
+const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, screen, session, shell, systemPreferences, utilityProcess } = require("electron");
 const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
@@ -496,15 +495,15 @@ function startBundledNextServer() {
     guestPublicBaseUrlPresent: Boolean(process.env.GUEST_PUBLIC_BASE_URL)
   });
 
-  nextServerProcess = spawn(process.execPath, [serverPath], {
+  nextServerProcess = utilityProcess.fork(serverPath, [], {
     cwd: path.dirname(serverPath),
     env: {
       ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
       NODE_ENV: "production",
       HOSTNAME: SERVER_HOST,
       PORT: String(port)
     },
+    serviceName: "MSTV Visio Local Server",
     stdio: "pipe"
   });
 
@@ -516,15 +515,17 @@ function startBundledNextServer() {
     log("Next server stderr", { data: String(data).trim() });
   });
 
-  nextServerProcess.on("error", (error) => {
-    log("Next server process error", { message: error.message });
+  nextServerProcess.on("spawn", () => {
+    log("Next server utility process spawned", { pid: nextServerProcess?.pid ?? null });
   });
 
-  nextServerProcess.on("exit", (code, signal) => {
-    log("Next server exited", { code, signal });
+  nextServerProcess.on("error", (type, location, report) => {
+    log("Next server utility process error", { type, location, report });
   });
 
-  nextServerProcess.unref();
+  nextServerProcess.on("exit", (code) => {
+    log("Next server exited", { code });
+  });
 }
 
 function stopBundledNextServer() {
