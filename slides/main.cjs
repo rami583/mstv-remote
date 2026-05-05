@@ -102,7 +102,7 @@ function setSelectedTargetApp(value) {
   return nextTargetApp;
 }
 
-function runAppleScript(script, timeoutMs = 1500) {
+function runAppleScript(script, timeoutMs = 650) {
   return new Promise((resolve, reject) => {
     execFile("/usr/bin/osascript", ["-e", script], { timeout: timeoutMs }, (error, stdout) => {
       if (error) {
@@ -112,12 +112,6 @@ function runAppleScript(script, timeoutMs = 1500) {
 
       resolve(String(stdout || "").trim());
     });
-  });
-}
-
-function delay(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
   });
 }
 
@@ -138,7 +132,9 @@ function getSlideExecutionDiagnostics(commandState) {
 
   return {
     targetApp: commandState?.applicationName ?? "none",
-    appActivated: steps.some((step) => step.startsWith("app-activated:")),
+    appActivated:
+      steps.some((step) => step.startsWith("app-activated:")) ||
+      steps.some((step) => step.startsWith("app-already-active:")),
     appleScriptSucceeded: steps.some((step) => step.startsWith("applescript-ok:")),
     appleScriptFailed: steps.some((step) => step.startsWith("applescript-failed:")),
     keyboardFallbackSent: steps.some((step) => step.startsWith("keyboard-sent:")),
@@ -162,96 +158,42 @@ function emitState() {
   }
 }
 
-async function sendPowerPointCommand(direction) {
-  const commandName = direction === "next" ? "next" : "previous";
-
-  await runAppleScript(`
-    tell application "Microsoft PowerPoint"
-      if slide show windows exists then
-        ${commandName} slide show view of slide show window 1
-      else
-        error "PowerPoint must be in slideshow/presentation mode."
-      end if
-    end tell
-  `);
-
-  return `powerpoint-applescript-${commandName}`;
-}
-
-async function sendKeynoteCommand(direction) {
-  const commandName = direction === "next" ? "show next" : "show previous";
-
-  await runAppleScript(`
-    tell application "Keynote"
-      if playing then
-        ${commandName}
-      else
-        error "Keynote must be in presentation/play mode."
-      end if
-    end tell
-  `);
-
-  return `keynote-applescript-${direction}`;
-}
-
 async function sendSlideCommand(direction) {
   const applicationName = serverState.selectedTargetApp || DEFAULT_TARGET_APP;
   const steps = [`target-app:${applicationName}`];
-
-  try {
-    await runAppleScript(`tell application ${JSON.stringify(applicationName)} to activate`, 1200);
-    steps.push(`app-activated:${applicationName}`);
-  } catch (error) {
-    steps.push(`app-activation-failed:${error instanceof Error ? error.message : String(error)}`);
-    throw error;
-  }
-  await delay(150);
-
-  if (applicationName === "Microsoft PowerPoint") {
-    try {
-      const method = await sendPowerPointCommand(direction);
-
-      steps.push(`applescript-ok:${method}`);
-      return {
-        applicationName,
-        method,
-        steps
-      };
-    } catch (error) {
-      steps.push(
-        `applescript-failed:${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
-  if (applicationName === "Keynote") {
-    try {
-      const method = await sendKeynoteCommand(direction);
-
-      steps.push(`applescript-ok:${method}`);
-      return {
-        applicationName,
-        method,
-        steps
-      };
-    } catch (error) {
-      steps.push(
-        `applescript-failed:${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
   const keyCodes = getFallbackKeyCodes(applicationName, direction);
   const [keyCode] = keyCodes;
 
   if (keyCode) {
-    await runAppleScript(`tell application "System Events" to key code ${keyCode}`);
+    const activationResult = await runAppleScript(`
+      tell application "System Events"
+        set frontAppName to name of first application process whose frontmost is true
+      end tell
+
+      if frontAppName is not ${JSON.stringify(applicationName)} then
+        tell application ${JSON.stringify(applicationName)} to activate
+        delay 0.06
+        set activationState to "activated"
+      else
+        set activationState to "already-active"
+      end if
+
+      tell application "System Events" to key code ${keyCode}
+      return activationState
+    `);
+
+    if (activationResult === "already-active") {
+      steps.push(`app-already-active:${applicationName}`);
+    } else {
+      steps.push(`app-activated:${applicationName}`);
+    }
+
     steps.push(`keyboard-sent:key-code-${keyCode}`);
   }
 
   return {
     applicationName,
-    method: "system-events-keyboard",
+    method: "keyboard-immediate",
     steps
   };
 }
