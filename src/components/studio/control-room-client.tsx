@@ -116,10 +116,21 @@ function useStudioInputPreview(videoDeviceId: string | null, enabled: boolean) {
       }
 
       try {
+        console.info("[MSTV Control] Preview getUserMedia requesting", JSON.stringify({
+          videoDeviceId
+        }));
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { deviceId: { exact: videoDeviceId } },
           audio: false
         });
+        console.info("[MSTV Control] Preview getUserMedia resolved", JSON.stringify({
+          videoDeviceId,
+          videoTracks: stream.getVideoTracks().map((track) => ({
+            label: track.label,
+            readyState: track.readyState,
+            muted: track.muted
+          }))
+        }));
 
         if (!active) {
           stream.getTracks().forEach((track) => track.stop());
@@ -134,6 +145,11 @@ function useStudioInputPreview(videoDeviceId: string | null, enabled: boolean) {
           return;
         }
 
+        console.info("[MSTV Control] Preview getUserMedia failed", JSON.stringify({
+          videoDeviceId,
+          name: previewError instanceof DOMException ? previewError.name : previewError instanceof Error ? previewError.name : null,
+          message: previewError instanceof Error ? previewError.message : String(previewError)
+        }));
         setPreviewStream(null);
         setError(
           previewError instanceof Error
@@ -673,19 +689,40 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
   const refreshMediaDevices = useCallback(async (requestPermissions: boolean) => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices) {
+      console.info("[MSTV Control] mediaDevices unavailable");
       return;
     }
 
     if (requestPermissions) {
-      const permissionStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
+      try {
+        console.info("[MSTV Control] Permission getUserMedia requesting");
+        const permissionStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
 
-      permissionStream.getTracks().forEach((track) => track.stop());
+        console.info("[MSTV Control] Permission getUserMedia resolved", JSON.stringify({
+          videoTrackCount: permissionStream.getVideoTracks().length,
+          audioTrackCount: permissionStream.getAudioTracks().length
+        }));
+        permissionStream.getTracks().forEach((track) => track.stop());
+      } catch (permissionError) {
+        console.info("[MSTV Control] Permission getUserMedia failed", JSON.stringify({
+          name: permissionError instanceof DOMException ? permissionError.name : permissionError instanceof Error ? permissionError.name : null,
+          message: permissionError instanceof Error ? permissionError.message : String(permissionError)
+        }));
+        throw permissionError;
+      }
     }
 
     const devices = await navigator.mediaDevices.enumerateDevices();
+    console.info("[MSTV Control] enumerateDevices result", JSON.stringify({
+      total: devices.length,
+      videoInputs: devices.filter((device) => device.kind === "videoinput").length,
+      audioInputs: devices.filter((device) => device.kind === "audioinput").length,
+      audioOutputs: devices.filter((device) => device.kind === "audiooutput").length,
+      labeledDevices: devices.filter((device) => Boolean(device.label)).length
+    }));
     const nextVideoInputs = devices
       .filter((device) => device.kind === "videoinput")
       .map((device, index) => ({
@@ -1001,7 +1038,9 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }, [isDesktopRuntime]);
 
   useEffect(() => {
-    void refreshMediaDevices(false).catch(() => undefined);
+    void refreshMediaDevices(isDesktopRuntime).catch((mediaError) => {
+      setError(mediaError instanceof Error ? mediaError.message : "Impossible d’accéder aux entrées audio/vidéo.");
+    });
 
     if (typeof navigator === "undefined" || !navigator.mediaDevices) {
       return;
@@ -1016,7 +1055,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     return () => {
       navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange);
     };
-  }, [refreshMediaDevices]);
+  }, [isDesktopRuntime, refreshMediaDevices]);
 
   useEffect(() => {
     setSessionSlugDraft(room || "studio");

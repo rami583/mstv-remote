@@ -1019,10 +1019,30 @@ export function ControlReturnFeedPublisher({
         imageRefreshIntervalRef.current = window.setInterval(drawFrame, 1000);
         nextStream = canvas.captureStream(1);
       } else {
+        console.info("[MSTV Return Publisher] getUserMedia requesting", JSON.stringify({
+          sourceLabel: activeSession.displayName,
+          videoDeviceId,
+          audioDeviceId,
+          hasVideo,
+          hasAudio
+        }));
         nextStream = await navigator.mediaDevices.getUserMedia({
           video: hasVideo ? { deviceId: { exact: videoDeviceId ?? undefined } } : false,
           audio: hasAudio ? { deviceId: { exact: audioDeviceId ?? undefined } } : false
         });
+        console.info("[MSTV Return Publisher] getUserMedia resolved", JSON.stringify({
+          sourceLabel: activeSession.displayName,
+          videoTracks: nextStream.getVideoTracks().map((track) => ({
+            label: track.label,
+            readyState: track.readyState,
+            muted: track.muted
+          })),
+          audioTracks: nextStream.getAudioTracks().map((track) => ({
+            label: track.label,
+            readyState: track.readyState,
+            muted: track.muted
+          }))
+        }));
       }
 
       if (cancelled) {
@@ -1094,6 +1114,13 @@ export function ControlReturnFeedPublisher({
         audioActive: false,
         error: getMediaCaptureErrorMessage(error)
       });
+      console.info("[MSTV Return Publisher] getUserMedia failed", JSON.stringify({
+        sourceLabel: session?.displayName ?? null,
+        videoDeviceId,
+        audioDeviceId,
+        name: error instanceof DOMException ? error.name : error instanceof Error ? error.name : null,
+        message: error instanceof Error ? error.message : String(error)
+      }));
     });
 
     return () => {

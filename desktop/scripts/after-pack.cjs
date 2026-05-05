@@ -1,22 +1,16 @@
 const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 
-const CAMERA_MESSAGE = "MSTV Visio utilise la caméra pour publier les entrées vidéo de régie.";
-const MICROPHONE_MESSAGE = "MSTV Visio utilise le micro pour publier les entrées audio de régie.";
+const CAMERA_MESSAGE = "MSTV Visio nécessite l'accès à la caméra pour la visio.";
+const MICROPHONE_MESSAGE = "MSTV Visio nécessite l'accès au microphone pour la visio.";
 
 function setPlistValue(plistPath, key, value) {
-  try {
-    execFileSync("/usr/libexec/PlistBuddy", ["-c", `Set :${key} ${value}`, plistPath], {
-      stdio: "ignore"
-    });
-  } catch {
-    execFileSync("/usr/libexec/PlistBuddy", ["-c", `Add :${key} string ${value}`, plistPath], {
-      stdio: "ignore"
-    });
-  }
+  execFileSync("/usr/bin/plutil", ["-replace", key, "-string", value, plistPath], {
+    stdio: "ignore"
+  });
 }
 
-exports.default = async function afterPack(context) {
+module.exports = async function afterPack(context) {
   if (context.electronPlatformName !== "darwin") {
     return;
   }
@@ -32,6 +26,7 @@ exports.default = async function afterPack(context) {
   ];
 
   for (const plistPath of plistPaths) {
+    console.log(`[afterPack] Updating macOS permissions in ${plistPath}`);
     setPlistValue(plistPath, "NSCameraUsageDescription", CAMERA_MESSAGE);
     setPlistValue(plistPath, "NSMicrophoneUsageDescription", MICROPHONE_MESSAGE);
     setPlistValue(plistPath, "CFBundleDisplayName", "MSTV Visio");

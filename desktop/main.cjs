@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
 
+const APP_NAME = "MSTV Visio";
 const DEFAULT_ROOM = "studio";
 const DEFAULT_PORT = 3100;
 const SERVER_HOST = "127.0.0.1";
@@ -15,6 +16,7 @@ const DESKTOP_CONFIG_ENV_KEYS = [
   "MSTV_DESKTOP_PORT"
 ];
 const KNOWN_ENV_KEYS = [...REQUIRED_ENV_KEYS, ...DESKTOP_CONFIG_ENV_KEYS];
+const SETUP_REQUIRED_ENV_KEYS = [...REQUIRED_ENV_KEYS, "GUEST_PUBLIC_BASE_URL"];
 const CONTROL_TILE_WIDTH = 507;
 const CONTROL_TILE_GAP = 16;
 const CONTROL_PAGE_HORIZONTAL_PADDING = 64;
@@ -24,7 +26,12 @@ const SLIDE_RECEIVER_TIMEOUT_MS = 10_000;
 let nextServerProcess = null;
 let controlWindow = null;
 let programWindow = null;
+let setupWindow = null;
 let logFilePath = null;
+let loadedDesktopEnvFiles = [];
+
+app.setName(APP_NAME);
+app.setPath("userData", path.join(app.getPath("appData"), APP_NAME));
 
 function log(message, details) {
   const line = `[${new Date().toISOString()}] ${message}${
@@ -66,6 +73,31 @@ function sanitizeRoomSlug(value) {
     .replace(/-{2,}/g, "-");
 
   return slug || DEFAULT_ROOM;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeEnvValue(value) {
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/"/g, '\\"');
+}
+
+function getUserConfigPath() {
+  return path.join(app.getPath("userData"), ".env.local");
+}
+
+function getMissingSetupKeys() {
+  return SETUP_REQUIRED_ENV_KEYS.filter((key) => !String(process.env[key] || "").trim());
+}
+
+function hasRequiredDesktopConfig() {
+  return getMissingSetupKeys().length === 0;
 }
 
 function buildRouteUrl(route, roomSlug) {
@@ -129,6 +161,7 @@ function findAncestorEnvFiles(startPath) {
 
 function getDesktopEnvCandidates() {
   const explicitEnvFile = process.env.MSTV_DESKTOP_ENV_FILE;
+  const newConfigPath = path.join(app.getPath("home"), "Library", "Application Support", APP_NAME, ".env.local");
   const candidates = [];
 
   if (explicitEnvFile) {
@@ -138,6 +171,7 @@ function getDesktopEnvCandidates() {
   if (app.isPackaged) {
     candidates.push(
       path.join(app.getPath("userData"), ".env.local"),
+      newConfigPath,
       path.join(app.getPath("home"), "Library", "Application Support", "MSTV Remote", ".env.local"),
       path.join(app.getPath("home"), ".mstv-remote", ".env.local"),
       ...findAncestorEnvFiles(process.resourcesPath)
@@ -183,6 +217,9 @@ function loadDesktopEnvironment() {
   }
 
   log("Desktop env file lookup", {
+    appName: app.getName(),
+    userDataPath: app.getPath("userData"),
+    configPath: getUserConfigPath(),
     found: loadedFiles.map((file) => ({
       path: file.path,
       loadedKeys: file.keys,
@@ -202,10 +239,12 @@ function loadDesktopEnvironment() {
     desktopUrl: process.env.MSTV_DESKTOP_URL || null,
     port: getDesktopPort()
   });
+
+  loadedDesktopEnvFiles = loadedFiles.map((file) => file.path);
 }
 
 function configureApplicationMenu() {
-  const appName = "MSTV Visio";
+  const appName = APP_NAME;
 
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -213,6 +252,26 @@ function configureApplicationMenu() {
         label: appName,
         submenu: [
           { role: "about", label: `À propos de ${appName}` },
+          { type: "separator" },
+          {
+            label: "Configuration…",
+            accelerator: "CommandOrControl+,",
+            click: () => {
+              void showSetupWindow({ required: false }).catch((error) => {
+                log("Configuration window failed", {
+                  message: error instanceof Error ? error.message : String(error)
+                });
+              });
+            }
+          },
+          { type: "separator" },
+          { role: "undo", label: "Annuler" },
+          { role: "redo", label: "Rétablir" },
+          { type: "separator" },
+          { role: "cut", label: "Couper" },
+          { role: "copy", label: "Copier" },
+          { role: "paste", label: "Coller" },
+          { role: "selectAll", label: "Tout sélectionner" },
           { type: "separator" },
           { role: "hide", label: `Masquer ${appName}` },
           { role: "hideOthers", label: "Masquer les autres" },
@@ -223,6 +282,361 @@ function configureApplicationMenu() {
       }
     ])
   );
+}
+
+function getSetupInitialValues() {
+  return {
+    LIVEKIT_URL: process.env.LIVEKIT_URL || "",
+    LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY || "",
+    LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET || "",
+    MSTV_DESKTOP_ROOM: getDesktopRoom(),
+    GUEST_PUBLIC_BASE_URL: process.env.GUEST_PUBLIC_BASE_URL || ""
+  };
+}
+
+function validateSetupConfig(config) {
+  const values = {
+    LIVEKIT_URL: String(config?.LIVEKIT_URL || "").trim(),
+    LIVEKIT_API_KEY: String(config?.LIVEKIT_API_KEY || "").trim(),
+    LIVEKIT_API_SECRET: String(config?.LIVEKIT_API_SECRET || "").trim(),
+    MSTV_DESKTOP_ROOM: sanitizeRoomSlug(config?.MSTV_DESKTOP_ROOM || DEFAULT_ROOM),
+    GUEST_PUBLIC_BASE_URL: String(config?.GUEST_PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "")
+  };
+  const missing = SETUP_REQUIRED_ENV_KEYS.filter((key) => !values[key]);
+
+  if (missing.length > 0) {
+    throw new Error(`Configuration incomplète: ${missing.join(", ")}`);
+  }
+
+  try {
+    const liveKitUrl = new URL(values.LIVEKIT_URL);
+    if (!["ws:", "wss:", "http:", "https:"].includes(liveKitUrl.protocol)) {
+      throw new Error("LIVEKIT_URL doit être une URL valide.");
+    }
+  } catch {
+    throw new Error("LIVEKIT_URL doit être une URL valide.");
+  }
+
+  try {
+    const guestUrl = new URL(values.GUEST_PUBLIC_BASE_URL);
+    if (!["http:", "https:"].includes(guestUrl.protocol)) {
+      throw new Error("GUEST_PUBLIC_BASE_URL doit commencer par http:// ou https://.");
+    }
+  } catch {
+    throw new Error("GUEST_PUBLIC_BASE_URL doit être une URL valide.");
+  }
+
+  return values;
+}
+
+function writeLocalSetupConfig(config) {
+  const values = validateSetupConfig(config);
+  const configPath = getUserConfigPath();
+  const contents = [
+    "# MSTV Visio local configuration",
+    "# Generated by the MSTV Visio setup window.",
+    `LIVEKIT_URL="${escapeEnvValue(values.LIVEKIT_URL)}"`,
+    `LIVEKIT_API_KEY="${escapeEnvValue(values.LIVEKIT_API_KEY)}"`,
+    `LIVEKIT_API_SECRET="${escapeEnvValue(values.LIVEKIT_API_SECRET)}"`,
+    `MSTV_DESKTOP_ROOM="${escapeEnvValue(values.MSTV_DESKTOP_ROOM)}"`,
+    `GUEST_PUBLIC_BASE_URL="${escapeEnvValue(values.GUEST_PUBLIC_BASE_URL)}"`,
+    ""
+  ].join("\n");
+
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, contents, { mode: 0o600 });
+
+  try {
+    fs.chmodSync(configPath, 0o600);
+  } catch {
+    // Some filesystems ignore chmod; the file is still stored in Application Support.
+  }
+
+  for (const [key, value] of Object.entries(values)) {
+    process.env[key] = value;
+  }
+
+  log("Desktop setup config saved", {
+    path: configPath,
+    keys: Object.keys(values),
+    secretKeysPresent: REQUIRED_ENV_KEYS.filter((key) => Boolean(values[key]))
+  });
+
+  return {
+    ok: true,
+    path: configPath,
+    roomSlug: values.MSTV_DESKTOP_ROOM
+  };
+}
+
+function buildSetupHtml() {
+  const initialValues = getSetupInitialValues();
+
+  return `
+    <!doctype html>
+    <html lang="fr">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Configuration MSTV Visio</title>
+        <style>
+          :root {
+            color-scheme: dark;
+            --bg: #04101c;
+            --bg-soft: #0c1b2d;
+            --panel: rgba(8, 18, 31, 0.86);
+            --panel-strong: rgba(12, 28, 48, 0.94);
+            --line: rgba(141, 240, 204, 0.18);
+            --text: #edf4ff;
+            --muted: #9fb2ca;
+            --green: #10b981;
+            --red: #ff5a36;
+          }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            background:
+              radial-gradient(circle at top left, rgba(247, 181, 0, 0.16), transparent 28%),
+              radial-gradient(circle at bottom right, rgba(141, 240, 204, 0.12), transparent 32%),
+              linear-gradient(135deg, rgba(3, 9, 17, 0.96), rgba(7, 17, 31, 0.98)),
+              var(--bg);
+            font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+          }
+          main {
+            display: flex;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+          }
+          form {
+            width: min(100%, 700px);
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            background: var(--panel);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+            padding: 24px;
+            backdrop-filter: blur(16px);
+          }
+          h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: -0.03em;
+          }
+          p {
+            margin: 10px 0 18px;
+            color: var(--muted);
+            line-height: 1.45;
+          }
+          .grid {
+            display: grid;
+            gap: 12px;
+          }
+          label {
+            display: grid;
+            gap: 7px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+          }
+          input {
+            width: 100%;
+            height: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.46);
+            color: var(--text);
+            font-size: 15px;
+            font-weight: 600;
+            padding: 0 16px;
+            outline: none;
+          }
+          input:focus {
+            border-color: rgba(141, 240, 204, 0.55);
+          }
+          .actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-top: 20px;
+          }
+          .status {
+            min-height: 18px;
+            color: #ffb7a6;
+            font-size: 13px;
+            line-height: 1.35;
+          }
+          button {
+            border: 0;
+            border-radius: 999px;
+            background: var(--green);
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            height: 36px;
+            letter-spacing: 0.08em;
+            padding: 0 16px;
+            text-transform: uppercase;
+            transition: filter 160ms ease, transform 160ms ease;
+          }
+          button:hover {
+            filter: brightness(1.08);
+          }
+          button:disabled {
+            cursor: default;
+            opacity: 0.6;
+          }
+          .hint {
+            margin: 14px 0 0;
+            color: rgba(159, 178, 202, 0.78);
+            font-size: 12px;
+          }
+        </style>
+      </head>
+      <body>
+        <main>
+          <form id="setup-form">
+            <h1>Configuration MSTV Visio</h1>
+            <p>Entrez les paramètres LiveKit et le lien public invité. Ils seront enregistrés localement sur ce Mac.</p>
+            <div class="grid">
+              <label>
+                LIVEKIT URL
+                <input id="LIVEKIT_URL" autocomplete="off" placeholder="wss://..." value="${escapeHtml(initialValues.LIVEKIT_URL)}" />
+              </label>
+              <label>
+                LIVEKIT API KEY
+                <input id="LIVEKIT_API_KEY" autocomplete="off" value="${escapeHtml(initialValues.LIVEKIT_API_KEY)}" />
+              </label>
+              <label>
+                LIVEKIT API SECRET
+                <input id="LIVEKIT_API_SECRET" type="password" autocomplete="off" value="${escapeHtml(initialValues.LIVEKIT_API_SECRET)}" />
+              </label>
+              <label>
+                Session par défaut
+                <input id="MSTV_DESKTOP_ROOM" autocomplete="off" value="${escapeHtml(initialValues.MSTV_DESKTOP_ROOM)}" />
+              </label>
+              <label>
+                Lien public invités
+                <input id="GUEST_PUBLIC_BASE_URL" autocomplete="off" placeholder="https://visio.monstudiotv.com" value="${escapeHtml(initialValues.GUEST_PUBLIC_BASE_URL)}" />
+              </label>
+            </div>
+            <p class="hint">Les secrets ne sont pas intégrés dans l’app. Par défaut, ils sont stockés dans Application Support sur ce Mac.</p>
+            <div class="actions">
+              <div id="status" class="status"></div>
+              <button id="save-button" type="submit">Enregistrer</button>
+            </div>
+          </form>
+        </main>
+        <script>
+          const form = document.getElementById("setup-form");
+          const saveButton = document.getElementById("save-button");
+          const status = document.getElementById("status");
+          const fields = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "MSTV_DESKTOP_ROOM", "GUEST_PUBLIC_BASE_URL"];
+
+          form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            status.textContent = "";
+            saveButton.disabled = true;
+
+            const config = Object.fromEntries(fields.map((field) => [field, document.getElementById(field).value]));
+
+            try {
+              await window.mstvSetup.save(config);
+              status.style.color = "#8df0cc";
+              status.textContent = "Configuration enregistrée. Ouverture de MSTV Visio...";
+            } catch (error) {
+              status.style.color = "#ffb7a6";
+              status.textContent = error instanceof Error ? error.message : String(error);
+              saveButton.disabled = false;
+            }
+          });
+
+        </script>
+      </body>
+    </html>
+  `;
+}
+
+function showSetupWindow(options = {}) {
+  const required = Boolean(options.required);
+
+  return new Promise((resolve, reject) => {
+    if (setupWindow && !setupWindow.isDestroyed()) {
+      setupWindow.focus();
+      resolve({ ok: false, alreadyOpen: true });
+      return;
+    }
+
+    let completed = false;
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const bounds = centeredBounds(primaryDisplay, 760, 760);
+
+    setupWindow = new BrowserWindow({
+      ...bounds,
+      title: "Configuration MSTV Visio",
+      backgroundColor: "#04101c",
+      resizable: false,
+      maximizable: false,
+      minimizable: true,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        preload: path.join(__dirname, "setup-preload.cjs")
+      }
+    });
+
+    const cleanup = () => {
+      ipcMain.removeHandler("mstv:setup-get-status");
+      ipcMain.removeHandler("mstv:setup-save");
+      ipcMain.removeHandler("mstv:setup-cancel");
+    };
+
+    ipcMain.handle("mstv:setup-get-status", () => ({
+      missing: getMissingSetupKeys(),
+      values: getSetupInitialValues(),
+      configPath: getUserConfigPath()
+    }));
+
+    ipcMain.handle("mstv:setup-save", async (_event, config) => {
+      const result = writeLocalSetupConfig(config);
+      await applySavedDesktopConfig();
+      completed = true;
+      setupWindow?.close();
+      cleanup();
+      resolve(result);
+      return result;
+    });
+
+    ipcMain.handle("mstv:setup-cancel", () => ({ ok: true }));
+
+    setupWindow.on("closed", () => {
+      setupWindow = null;
+
+      if (!completed && required) {
+        cleanup();
+        reject(new Error("Configuration MSTV Visio annulée."));
+      } else if (!completed) {
+        cleanup();
+        resolve({ ok: false, cancelled: true });
+      }
+    });
+
+    setupWindow.setMenuBarVisibility(false);
+    setupWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(buildSetupHtml())}`);
+    setupWindow.once("ready-to-show", () => {
+      setupWindow?.show();
+      setupWindow?.focus();
+    });
+  });
 }
 
 function waitForServer(url, timeoutMs = 30_000) {
@@ -294,6 +708,59 @@ function startBundledNextServer() {
   nextServerProcess.unref();
 }
 
+function stopBundledNextServer() {
+  if (!nextServerProcess) {
+    return Promise.resolve();
+  }
+
+  const processToStop = nextServerProcess;
+  nextServerProcess = null;
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (resolved) {
+        return;
+      }
+
+      resolved = true;
+      resolve();
+    };
+
+    processToStop.once("exit", finish);
+    processToStop.kill();
+    setTimeout(finish, 1500);
+  });
+}
+
+async function applySavedDesktopConfig() {
+  log("Applying saved desktop config", {
+    roomSlug: getDesktopRoom(),
+    publicGuestBaseUrlPresent: Boolean(process.env.GUEST_PUBLIC_BASE_URL),
+    packaged: app.isPackaged,
+    usesExternalDesktopUrl: Boolean(process.env.MSTV_DESKTOP_URL)
+  });
+
+  if (programWindow && !programWindow.isDestroyed()) {
+    closeProgramWindow();
+  }
+
+  if (app.isPackaged && !process.env.MSTV_DESKTOP_URL && (nextServerProcess || controlWindow)) {
+    await stopBundledNextServer();
+    startBundledNextServer();
+    await waitForServer(getBaseUrl());
+  }
+
+  if (controlWindow && !controlWindow.isDestroyed()) {
+    const controlUrl = buildRouteUrl("control");
+
+    log("Reloading Control after config save", { url: controlUrl });
+    await controlWindow.loadURL(controlUrl);
+    controlWindow.show();
+    controlWindow.focus();
+  }
+}
+
 function configurePermissions() {
   if (process.platform === "darwin") {
     for (const mediaType of ["camera", "microphone"]) {
@@ -305,6 +772,16 @@ function configurePermissions() {
           requestTiming:
             status === "not-determined" ? "requested when a studio input opens" : "already decided"
         });
+
+        if (status === "not-determined") {
+          void systemPreferences.askForMediaAccess(mediaType).then((granted) => {
+            log("macOS media permission request completed", {
+              mediaType,
+              granted,
+              status: systemPreferences.getMediaAccessStatus(mediaType)
+            });
+          });
+        }
       } catch (error) {
         log("macOS media permission check failed", {
           mediaType,
@@ -739,6 +1216,15 @@ function configureDesktopIpc() {
 
 async function createWindows() {
   loadDesktopEnvironment();
+  if (!hasRequiredDesktopConfig()) {
+    log("Desktop setup required", {
+      missing: getMissingSetupKeys(),
+      configPath: getUserConfigPath(),
+      loadedEnvFiles: loadedDesktopEnvFiles
+    });
+    await showSetupWindow({ required: true });
+  }
+
   logDisplays();
   startBundledNextServer();
   log("Waiting for Next server", { url: getBaseUrl() });
@@ -822,7 +1308,7 @@ function showStartupError(error) {
   dialog.showErrorBox("MSTV Visio", message);
 }
 
-app.name = "MSTV Visio";
+app.name = APP_NAME;
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.whenReady().then(async () => {

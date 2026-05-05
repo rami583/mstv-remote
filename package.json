@@ -44,13 +44,14 @@
   "build": {
     "appId": "tv.monstudio.mstvvisio",
     "productName": "MSTV Visio",
-    "afterPack": "desktop/scripts/after-pack.cjs",
+    "afterPack": "./desktop/scripts/after-pack.cjs",
     "directories": {
       "output": "dist"
     },
     "files": [
       "desktop/main.cjs",
       "desktop/preload.cjs",
+      "desktop/setup-preload.cjs",
       "package.json"
     ],
     "extraResources": [
@@ -77,8 +78,8 @@
       "entitlements": "desktop/entitlements.mac.plist",
       "entitlementsInherit": "desktop/entitlements.mac.plist",
       "extendInfo": {
-        "NSCameraUsageDescription": "MSTV Visio utilise la caméra pour publier les entrées vidéo de régie.",
-        "NSMicrophoneUsageDescription": "MSTV Visio utilise le micro pour publier les entrées audio de régie."
+        "NSCameraUsageDescription": "MSTV Visio nécessite l'accès à la caméra pour la visio.",
+        "NSMicrophoneUsageDescription": "MSTV Visio nécessite l'accès au microphone pour la visio."
       }
     }
   }
