@@ -68,11 +68,13 @@ interface ControlGuestGridSurfaceProps extends BaseSessionProps {
     microphoneIndicator: MediaStatusIndicator;
     effectiveReturnSource: ReturnSource;
     connectionQuality: RuntimeParticipantState["connectionQuality"];
+    programAudioMuted: boolean;
     returnSourceControlDisabled: boolean;
     disconnectControlDisabled: boolean;
     slideControlEnabled: boolean;
   }>;
   onToggleGuest: (participantId: string) => void;
+  onToggleProgramAudioMute?: (participantId: string) => void;
   onToggleGuestSlideControl?: (participantId: string) => void;
   onSelectGuestReturnSource?: (participantId: string, source: ReturnSource) => void;
   onDisconnectGuest?: (participantId: string) => void;
@@ -1182,6 +1184,7 @@ export function ControlReturnFeedPublisher({
 function ControlGuestGridContent({
   guests,
   onToggleGuest,
+  onToggleProgramAudioMute,
   onToggleGuestSlideControl,
   onSelectGuestReturnSource,
   onDisconnectGuest,
@@ -1194,6 +1197,7 @@ function ControlGuestGridContent({
   ControlGuestGridSurfaceProps,
   | "guests"
   | "onToggleGuest"
+  | "onToggleProgramAudioMute"
   | "onToggleGuestSlideControl"
   | "onSelectGuestReturnSource"
   | "onDisconnectGuest"
@@ -1225,7 +1229,7 @@ function ControlGuestGridContent({
     [concreteAudioTracks]
   );
   const programAudioTracks = guests
-    .filter((guest) => guest.inProgram)
+    .filter((guest) => guest.inProgram && !guest.programAudioMuted)
     .map((guest) => participantAudioTrackMap.get(guest.participantId))
     .filter((trackRef): trackRef is TrackReference => trackRef !== undefined);
   const regieMonitorAudioTracks = guests
@@ -1375,13 +1379,36 @@ function ControlGuestGridContent({
               <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
               <div className="pointer-events-none absolute left-4 top-4 z-20 flex gap-2">
-                <div
-                  className={`${pillBaseClassName} ${getIndicatorClasses(
-                    guest.microphoneIndicator.tone
-                  )}`}
-                >
-                  Mic
-                </div>
+                {guest.inProgram ? (
+                  <button
+                    type="button"
+                    aria-pressed={!guest.programAudioMuted}
+                    title={
+                      guest.programAudioMuted
+                        ? "Réactiver le micro dans le Program"
+                        : "Couper le micro dans le Program"
+                    }
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleProgramAudioMute?.(guest.participantId);
+                    }}
+                    className={`${pillBaseClassName} pointer-events-auto transition ${
+                      guest.programAudioMuted
+                        ? getIndicatorClasses("red")
+                        : getIndicatorClasses("green")
+                    }`}
+                  >
+                    Mic
+                  </button>
+                ) : (
+                  <div
+                    className={`${pillBaseClassName} ${getIndicatorClasses(
+                      guest.microphoneIndicator.tone
+                    )}`}
+                  >
+                    Mic
+                  </div>
+                )}
                 <div
                   className={`${pillBaseClassName} ${getIndicatorClasses(
                     guest.cameraIndicator.tone
@@ -1606,6 +1633,7 @@ export function ControlGuestGridSurface({
   channel,
   guests,
   onToggleGuest,
+  onToggleProgramAudioMute,
   onToggleGuestSlideControl,
   onSelectGuestReturnSource,
   onDisconnectGuest,
@@ -1627,6 +1655,7 @@ export function ControlGuestGridSurface({
       <ControlGuestGridContent
         guests={guests}
         onToggleGuest={onToggleGuest}
+        onToggleProgramAudioMute={onToggleProgramAudioMute}
         onToggleGuestSlideControl={onToggleGuestSlideControl}
         onSelectGuestReturnSource={onSelectGuestReturnSource}
         onDisconnectGuest={onDisconnectGuest}

@@ -681,6 +681,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   });
   const [productionSnapshot, setProductionSnapshot] = useState<ProductionSnapshot | null>(null);
   const [programGuestIds, setProgramGuestIds] = useState<string[]>([]);
+  const [programMutedGuestIds, setProgramMutedGuestIds] = useState<string[]>([]);
   const [slideControlEnabledGuestIds, setSlideControlEnabledGuestIds] = useState<string[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceOption[]>([]);
   const [audioInputs, setAudioInputs] = useState<MediaDeviceOption[]>([]);
@@ -1243,6 +1244,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             effectiveReturnSource,
             connectionQuality:
               liveGuestStatesById.get(guest.participantId)?.connectionQuality ?? "unknown",
+            programAudioMuted: programMutedGuestIds.includes(guest.participantId),
             returnSourceControlDisabled: inProgram,
             disconnectControlDisabled: inProgram,
             slideControlEnabled: slideControlEnabledGuestIds.includes(guest.participantId),
@@ -1263,6 +1265,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       liveGuestStates,
       presentGuestIds,
       productionSnapshot?.participants,
+      programMutedGuestIds,
       programGuestIds,
       room,
       slideControlEnabledGuestIds
@@ -1386,10 +1389,16 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       setSlideControlEnabledGuestIds((current) =>
         current.filter((participantId) => presentGuestIds.includes(participantId))
       );
+      setProgramMutedGuestIds((current) =>
+        current.filter((participantId) => presentGuestIds.includes(participantId))
+      );
       return;
     }
 
     setProgramGuestIds(nextSelection);
+    setProgramMutedGuestIds((current) =>
+      current.filter((participantId) => nextSelection.includes(participantId))
+    );
     setSlideControlEnabledGuestIds((current) =>
       current.filter((participantId) => presentGuestIds.includes(participantId))
     );
@@ -1410,6 +1419,12 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }, [presentGuestIds, programGuestIds, room, updateLocalProductionSnapshot]);
 
   useEffect(() => {
+    setProgramMutedGuestIds((current) =>
+      current.filter((participantId) => programGuestIds.includes(participantId))
+    );
+  }, [programGuestIds]);
+
+  useEffect(() => {
     if (returnInputsEnabled) {
       return;
     }
@@ -1428,6 +1443,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   async function handleToggleGuest(participantId: string) {
     const previousSelection = programGuestIds;
     const previousSnapshot = productionSnapshot;
+    const previousProgramMutedGuestIds = programMutedGuestIds;
     const nextSelection = programGuestIds.includes(participantId)
       ? programGuestIds.filter((id) => id !== participantId)
       : programGuestIds.length < 3
@@ -1439,6 +1455,9 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     }
 
     setProgramGuestIds(nextSelection);
+    setProgramMutedGuestIds((current) =>
+      current.filter((participantId) => nextSelection.includes(participantId))
+    );
     updateLocalProductionSnapshot((snapshot) => ({
       ...snapshot,
       programGuestIds: nextSelection,
@@ -1454,11 +1473,24 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       setError(null);
     } catch (updateError) {
       setProgramGuestIds(previousSelection);
+      setProgramMutedGuestIds(previousProgramMutedGuestIds);
       setProductionSnapshot(previousSnapshot);
       setError(
         updateError instanceof Error ? updateError.message : "Unable to update the program scene."
       );
     }
+  }
+
+  function handleToggleProgramAudioMute(participantId: string) {
+    if (!programGuestIds.includes(participantId)) {
+      return;
+    }
+
+    setProgramMutedGuestIds((current) =>
+      current.includes(participantId)
+        ? current.filter((id) => id !== participantId)
+        : [...current, participantId]
+    );
   }
 
   function handleToggleGuestSlideControl(participantId: string) {
@@ -1683,6 +1715,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     const nextSelection = programGuestIds.filter((id) => id !== participantId);
 
     setProgramGuestIds(nextSelection);
+    setProgramMutedGuestIds((current) => current.filter((guestId) => guestId !== participantId));
     setPresentGuestIds((current) =>
       current ? current.filter((guestId) => guestId !== participantId) : current
     );
@@ -2079,6 +2112,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           channel="contribution"
           guests={guests}
           onToggleGuest={handleToggleGuest}
+          onToggleProgramAudioMute={handleToggleProgramAudioMute}
           onToggleGuestSlideControl={handleToggleGuestSlideControl}
           onSelectGuestReturnSource={handleSelectGuestReturnSource}
           onDisconnectGuest={handleDisconnectGuest}
