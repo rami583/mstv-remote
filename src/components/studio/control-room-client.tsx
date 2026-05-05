@@ -1735,23 +1735,15 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }
 
   function getStudioInputStatus(inputId: ReturnSource) {
-    const activeToneClassNames: Record<ReturnSource, string> = {
-      STUDIO: "border-transparent bg-emerald-500 text-white",
-      REGIE: "border-transparent bg-amber-500 text-white",
-      IMAGE: "border-transparent bg-sky-500 text-white"
-    };
-    const activeTileClassNames: Record<ReturnSource, string> = {
-      STUDIO: "border-emerald-500/60 bg-white/[0.06]",
-      REGIE: "border-amber-500/60 bg-white/[0.06]",
-      IMAGE: "border-sky-500/60 bg-white/[0.06]"
-    };
     const isActive = inputId === visuallyActiveReturnSource;
 
     return {
-      toneClassName: isActive ? activeToneClassNames[inputId] : "border-transparent bg-tally text-white",
+      toneClassName: isActive
+        ? "border-transparent bg-sky-500 text-white"
+        : "border-transparent bg-slate-600 text-white",
       tileToneClassName: isActive
-        ? activeTileClassNames[inputId]
-        : "border-tally/30 bg-white/[0.03] hover:border-tally/40 hover:bg-white/[0.05]"
+        ? "border-sky-500/60 bg-white/[0.06]"
+        : "border-slate-600/40 bg-white/[0.03] hover:border-slate-500/60 hover:bg-white/[0.05]"
     };
   }
 
