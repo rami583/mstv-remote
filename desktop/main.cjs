@@ -398,7 +398,7 @@ function showSetupWindow(options = {}) {
     setupWindow = new BrowserWindow({
       ...bounds,
       title: "Configuration MSTV Visio",
-      backgroundColor: "#04101c",
+      backgroundColor: "#050505",
       resizable: false,
       maximizable: false,
       minimizable: true,

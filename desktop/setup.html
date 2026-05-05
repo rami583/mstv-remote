@@ -7,12 +7,12 @@
     <style>
       :root {
         color-scheme: dark;
-        --bg: #04101c;
-        --panel: rgba(8, 18, 31, 0.88);
-        --line: rgba(141, 240, 204, 0.18);
-        --text: #edf4ff;
-        --muted: #9fb2ca;
-        --green: #10b981;
+        --bg: #050505;
+        --panel: #111111;
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #ffffff;
+        --muted: #a1a1aa;
+        --action: #27272a;
         --red: #ff5a36;
         --button-height: 36px;
         --button-padding-x: 14px;
@@ -111,12 +111,12 @@
       }
 
       input:focus {
-        border-color: rgba(16, 185, 129, 0.7);
-        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+        border-color: rgba(255, 255, 255, 0.36);
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
       }
 
       input::selection {
-        background: rgba(16, 185, 129, 0.35);
+        background: rgba(255, 255, 255, 0.24);
       }
 
       input:-webkit-autofill,
@@ -130,7 +130,7 @@
 
       .hint {
         margin: 14px 0 0;
-        color: rgba(159, 178, 202, 0.78);
+        color: rgba(212, 212, 216, 0.72);
         font-size: 12px;
       }
 
@@ -154,7 +154,7 @@
         cursor: pointer;
         border: 1px solid rgba(255, 255, 255, 0.14);
         border-radius: var(--button-radius);
-        background: var(--green);
+        background: var(--action);
         height: var(--button-height);
         padding: 0 var(--button-padding-x);
         color: white;
@@ -239,7 +239,7 @@
 
         try {
           await window.mstvSetup.save(config);
-          status.style.color = "#8df0cc";
+          status.style.color = "#ffffff";
           status.textContent = "Configuration enregistrée. Ouverture de MSTV Visio...";
         } catch (error) {
           status.style.color = "#ffb7a6";
