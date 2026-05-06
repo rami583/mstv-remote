@@ -182,6 +182,45 @@ function formatChatTime(value: string) {
   });
 }
 
+function ControlChatMessageList({ messages }: { messages: PrivateChatMessage[] }) {
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({
+      block: "end",
+      behavior: "smooth"
+    });
+  }, [messages.length]);
+
+  return (
+    <div className="mb-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      {messages.length > 0 ? (
+        messages.map((message) => (
+          <div
+            key={message.messageId}
+            className={`rounded-2xl px-3 py-2 text-xs ${
+              message.fromRole === "control"
+                ? "ml-8 bg-sky-500 text-white"
+                : "mr-8 bg-white/10 text-slate-100"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2 text-[9px] font-bold uppercase tracking-[0.12em] opacity-75">
+              <span>{message.fromRole === "control" ? "Régie" : "Invité"}</span>
+              <span>{formatChatTime(message.createdAt)}</span>
+            </div>
+            <p className="mt-1 leading-snug">{message.body}</p>
+          </div>
+        ))
+      ) : (
+        <div className="flex h-full items-center justify-center rounded-2xl bg-white/5 px-3 py-2 text-xs text-slate-400">
+          Aucun message.
+        </div>
+      )}
+      <div ref={bottomRef} aria-hidden="true" />
+    </div>
+  );
+}
+
 function buildRemoteParticipantStates(remoteParticipants: ReturnType<typeof useRemoteParticipants>) {
   return remoteParticipants.map((participant): RuntimeParticipantState => {
     const metadata = parseParticipantMetadata(participant.metadata);
@@ -2332,30 +2371,7 @@ function ControlGuestGridContent({
                       Retour
                     </button>
                   </div>
-                  <div className="mb-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                    {chatMessages.length > 0 ? (
-                      chatMessages.map((message) => (
-                        <div
-                          key={message.messageId}
-                          className={`rounded-2xl px-3 py-2 text-xs ${
-                            message.fromRole === "control"
-                              ? "ml-8 bg-sky-500 text-white"
-                              : "mr-8 bg-white/10 text-slate-100"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 text-[9px] font-bold uppercase tracking-[0.12em] opacity-75">
-                            <span>{message.fromRole === "control" ? "Régie" : "Invité"}</span>
-                            <span>{formatChatTime(message.createdAt)}</span>
-                          </div>
-                          <p className="mt-1 leading-snug">{message.body}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="flex h-full items-center justify-center rounded-2xl bg-white/5 px-3 py-2 text-xs text-slate-400">
-                        Aucun message.
-                      </div>
-                    )}
-                  </div>
+                  <ControlChatMessageList messages={chatMessages} />
                   <form
                     className="flex gap-2"
                     onSubmit={(event) => {

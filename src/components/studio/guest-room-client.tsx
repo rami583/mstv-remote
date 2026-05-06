@@ -175,6 +175,18 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
   const [isJoiningLive, setIsJoiningLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastSlideCommandAtRef = useRef(0);
+  const privateChatBottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!privateChatOpen) {
+      return;
+    }
+
+    privateChatBottomRef.current?.scrollIntoView({
+      block: "end",
+      behavior: "smooth"
+    });
+  }, [privateChatMessages.length, privateChatOpen]);
 
   useEffect(() => {
     return () => {
@@ -833,6 +845,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                       Aucun message.
                     </p>
                   )}
+                  <div ref={privateChatBottomRef} aria-hidden="true" />
                 </div>
                 <form
                   className="flex gap-1.5"
