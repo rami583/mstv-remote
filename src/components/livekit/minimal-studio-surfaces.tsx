@@ -13,6 +13,7 @@ import {
 } from "@livekit/components-react";
 import { ConnectionQuality, Room, RoomEvent, Track } from "livekit-client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AudioLevelMeter } from "@/components/studio/audio-level-meter";
 import { parseParticipantMetadata } from "@/lib/livekit/metadata";
 import { getIndicatorClasses, type MediaStatusIndicator } from "@/lib/studio/media-status";
 import type { TokenResponsePayload } from "@/lib/types/livekit";
@@ -1636,7 +1637,10 @@ export function ControlReturnFeedPublisher({
       await clearPublishedTracks();
 
       streamRef.current = nextStream;
-      const previewStream = nextVideoTrack ? new MediaStream([nextVideoTrack]) : null;
+      const previewTracks = [nextVideoTrack, nextAudioTrack].filter(
+        (track): track is MediaStreamTrack => track !== null
+      );
+      const previewStream = previewTracks.length > 0 ? new MediaStream(previewTracks) : null;
 
       onPreviewStreamChangeRef.current?.(previewStream);
       onDebugStateChangeRef.current?.({
@@ -1864,6 +1868,13 @@ function ControlGuestGridContent({
         {guests.map((guest) => {
         const trackRef = participantTrackMap.get(guest.participantId);
         const isActiveInRegie = !guest.inProgram && guest.effectiveReturnSource === "REGIE";
+        const audibleAudioTrackRef =
+          guest.inProgram && !guest.programAudioMuted
+            ? participantAudioTrackMap.get(guest.participantId)
+            : isActiveInRegie && !guest.regieAudioMuted
+              ? participantAudioTrackMap.get(guest.participantId)
+              : undefined;
+        const audibleAudioTrack = audibleAudioTrackRef ? getMediaStreamTrack(audibleAudioTrackRef) : null;
         const selectionLimitReached = !guest.inProgram && guests.filter((item) => item.inProgram).length >= 3;
         const activeActionPillClassName =
           "border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
@@ -1918,6 +1929,7 @@ function ControlGuestGridContent({
               )}
 
               <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+              <AudioLevelMeter track={audibleAudioTrack} />
 
               <div className="pointer-events-none absolute left-4 top-4 z-20 flex gap-2">
                 {guest.inProgram || isActiveInRegie ? (

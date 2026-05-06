@@ -10,6 +10,7 @@ import {
   type ReturnFeedPublisherDebugState,
   type ReturnFeedPublisherState
 } from "@/components/livekit/minimal-studio-surfaces";
+import { AudioLevelMeter } from "@/components/studio/audio-level-meter";
 import { fetchLiveKitToken } from "@/lib/livekit/browser-token";
 import { buildParticipantIdentity } from "@/lib/livekit/identity";
 import {
@@ -353,6 +354,7 @@ function StudioInputTile(input: {
         ) : null}
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        {!isImageTile ? <AudioLevelMeter stream={input.previewStream} /> : null}
 
         {isImageTile && isDraggingImage ? (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center border-2 border-dashed border-sky-200/80 bg-sky-500/15">
