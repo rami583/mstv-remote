@@ -775,7 +775,6 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                 }}
                 onPrivateChatMessageReceived={handlePrivateChatReceived}
               />
-              <LocalPreviewGuide />
 
               <div className="absolute left-2 top-2 z-20 flex gap-1.5">
                 <div
