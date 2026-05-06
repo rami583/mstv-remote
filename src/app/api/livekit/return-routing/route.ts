@@ -12,6 +12,7 @@ const returnRoutingSyncSchema = z.object({
   room: z.string().trim().min(1).max(120),
   globalReturnSource: z.enum(returnSources),
   programGuestIds: z.array(z.string().trim().min(1).max(180)),
+  programMutedGuestIds: z.array(z.string().trim().min(1).max(180)).optional(),
   slideControlEnabledGuestIds: z.array(z.string().trim().min(1).max(180)).optional(),
   guestReturnOverrides: z.record(z.enum(returnSources).optional()),
   routingVersion: z.number().finite().positive()
@@ -64,6 +65,9 @@ export async function POST(request: Request) {
 
     const contributionParticipantId = deriveContributionParticipantId(participant.identity);
     const isInProgram = parsed.data.programGuestIds.includes(contributionParticipantId);
+    const programAudioMuted = (parsed.data.programMutedGuestIds ?? []).includes(
+      contributionParticipantId
+    );
     const canControlSlides = (parsed.data.slideControlEnabledGuestIds ?? []).includes(
       contributionParticipantId
     );
@@ -77,6 +81,7 @@ export async function POST(request: Request) {
       ...metadata,
       assignedReturnSource,
       isInProgram,
+      programAudioMuted,
       canControlSlides,
       returnRoutingVersion: parsed.data.routingVersion
     };

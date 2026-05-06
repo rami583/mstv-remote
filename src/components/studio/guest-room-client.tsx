@@ -138,6 +138,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
   const [productionSnapshot, setProductionSnapshot] = useState<ProductionSnapshot | null>(null);
   const [liveProgramGuestIds, setLiveProgramGuestIds] = useState<string[] | null>(null);
   const [liveProgramStatus, setLiveProgramStatus] = useState<boolean | null>(null);
+  const [liveProgramAudioMuted, setLiveProgramAudioMuted] = useState(false);
   const [liveAssignedReturnSource, setLiveAssignedReturnSource] = useState<ReturnSource | null>(null);
   const [slideControlAuthorized, setSlideControlAuthorized] = useState(false);
   const [pendingSlideCommand, setPendingSlideCommand] =
@@ -403,7 +404,10 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
   }, [identity, liveAssignedReturnSource, productionSnapshot]);
 
   const isGuestActiveForControlRoom = isInProgram || assignedReturnSource === "REGIE";
-  const guestProgramStatusIndicator: MediaStatusIndicator = isGuestActiveForControlRoom
+  const guestMicActiveForControlRoom = isInProgram
+    ? !liveProgramAudioMuted
+    : assignedReturnSource === "REGIE";
+  const guestMicStatusIndicator: MediaStatusIndicator = guestMicActiveForControlRoom
     ? {
         tone: "green",
         label: "LIVE",
@@ -416,8 +420,29 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
         detail: "MUTED_REGIE",
         description: "Not selected in Program."
       };
-  const guestInactiveBadgeStyle =
-    guestProgramStatusIndicator.tone === "red"
+  const guestCamStatusIndicator: MediaStatusIndicator = isGuestActiveForControlRoom
+    ? {
+        tone: "green",
+        label: "LIVE",
+        detail: "LIVE",
+        description: "Active with the control room."
+      }
+    : {
+        tone: "red",
+        label: "MUTED",
+        detail: "OFF_REGIE",
+        description: "Not selected in Program."
+      };
+  const guestMicInactiveBadgeStyle =
+    guestMicStatusIndicator.tone === "red"
+      ? {
+          backgroundColor: "#d4301f",
+          borderColor: "transparent",
+          color: "#ffffff"
+        }
+      : undefined;
+  const guestCamInactiveBadgeStyle =
+    guestCamStatusIndicator.tone === "red"
       ? {
           backgroundColor: "#d4301f",
           borderColor: "transparent",
@@ -626,6 +651,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
             onAssignedReturnSourceChange={setLiveAssignedReturnSource}
             onProgramGuestIdsChange={handleProgramGuestIdsChange}
             onProgramStatusChange={setLiveProgramStatus}
+            onProgramAudioMutedChange={setLiveProgramAudioMuted}
             onSlideControlAuthorizedChange={setSlideControlAuthorized}
             pendingSlideCommand={pendingSlideCommand}
             onSlideCommandSent={(commandId) => {
@@ -652,14 +678,14 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
 
               <div className="absolute left-2 top-2 z-20 flex gap-1.5">
                 <div
-                  className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
-                  style={guestInactiveBadgeStyle}
+                  className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${getIndicatorClasses(guestMicStatusIndicator.tone)}`}
+                  style={guestMicInactiveBadgeStyle}
                 >
                   Mic
                 </div>
                 <div
-                  className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${getIndicatorClasses(guestProgramStatusIndicator.tone)}`}
-                  style={guestInactiveBadgeStyle}
+                  className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${getIndicatorClasses(guestCamStatusIndicator.tone)}`}
+                  style={guestCamInactiveBadgeStyle}
                 >
                   Cam
                 </div>

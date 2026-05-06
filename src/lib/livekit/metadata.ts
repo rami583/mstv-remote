@@ -9,6 +9,7 @@ export interface ParticipantMetadata {
   sourceLabel?: ReturnSource | null;
   assignedReturnSource?: ReturnSource | null;
   isInProgram?: boolean | null;
+  programAudioMuted?: boolean | null;
   canControlSlides?: boolean | null;
   returnRoutingVersion?: number | null;
 }

@@ -44,6 +44,7 @@ interface ProgramReturnSurfaceProps extends BaseSessionProps {
   onAssignedReturnSourceChange?: (source: ReturnSource) => void;
   onProgramGuestIdsChange?: (programGuestIds: string[]) => void;
   onProgramStatusChange?: (isInProgram: boolean) => void;
+  onProgramAudioMutedChange?: (isMuted: boolean) => void;
   onSlideControlAuthorizedChange?: (authorized: boolean) => void;
   pendingSlideCommand?: PendingSlideControlCommand | null;
   onSlideCommandSent?: (commandId: string) => void;
@@ -107,6 +108,7 @@ interface ProgramReturnRoutingPayload {
   room: string;
   globalReturnSource: ReturnSource;
   programGuestIds: string[];
+  programMutedGuestIds?: string[];
   slideControlEnabledGuestIds?: string[];
   guestReturnOverrides: Record<string, ReturnSource | undefined>;
   routingVersion: number;
@@ -348,6 +350,7 @@ function ProgramReturnContent({
   onAssignedReturnSourceChange,
   onProgramGuestIdsChange,
   onProgramStatusChange,
+  onProgramAudioMutedChange,
   onSlideControlAuthorizedChange,
   pendingSlideCommand,
   onSlideCommandSent
@@ -358,6 +361,7 @@ function ProgramReturnContent({
   onAssignedReturnSourceChange?: (source: ReturnSource) => void;
   onProgramGuestIdsChange?: (programGuestIds: string[]) => void;
   onProgramStatusChange?: (isInProgram: boolean) => void;
+  onProgramAudioMutedChange?: (isMuted: boolean) => void;
   onSlideControlAuthorizedChange?: (authorized: boolean) => void;
   pendingSlideCommand?: PendingSlideControlCommand | null;
   onSlideCommandSent?: (commandId: string) => void;
@@ -443,12 +447,18 @@ function ProgramReturnContent({
       onProgramStatusChange?.(localMetadata.isInProgram);
     }
 
+    if (typeof localMetadata?.programAudioMuted === "boolean") {
+      onProgramAudioMutedChange?.(localMetadata.programAudioMuted);
+    }
+
     if (typeof localMetadata?.canControlSlides === "boolean") {
       onSlideControlAuthorizedChange?.(localMetadata.canControlSlides);
     }
   }, [
     localMetadata?.canControlSlides,
     localMetadata?.isInProgram,
+    localMetadata?.programAudioMuted,
+    onProgramAudioMutedChange,
     onProgramStatusChange,
     onSlideControlAuthorizedChange
   ]);
@@ -475,7 +485,11 @@ function ProgramReturnContent({
         const nextCanControlSlides = (parsed.slideControlEnabledGuestIds ?? []).some((participantId) =>
           possibleProgramStatusIds.has(participantId)
         );
+        const nextProgramAudioMuted = (parsed.programMutedGuestIds ?? []).some((participantId) =>
+          possibleProgramStatusIds.has(participantId)
+        );
         onProgramStatusChange?.(nextIsInProgram);
+        onProgramAudioMutedChange?.(nextProgramAudioMuted);
         onSlideControlAuthorizedChange?.(nextCanControlSlides);
 
         const nextSource = nextIsInProgram
@@ -510,6 +524,7 @@ function ProgramReturnContent({
     localParticipant.sid,
     onProgramGuestIdsChange,
     onAssignedReturnSourceChange,
+    onProgramAudioMutedChange,
     onProgramStatusChange,
     onSlideControlAuthorizedChange,
     possibleProgramStatusIds,
@@ -1556,6 +1571,7 @@ export function GuestProgramReturnSurface({
   onAssignedReturnSourceChange,
   onProgramGuestIdsChange,
   onProgramStatusChange,
+  onProgramAudioMutedChange,
   onSlideControlAuthorizedChange,
   pendingSlideCommand,
   onSlideCommandSent,
@@ -1576,6 +1592,7 @@ export function GuestProgramReturnSurface({
         onAssignedReturnSourceChange={onAssignedReturnSourceChange}
         onProgramGuestIdsChange={onProgramGuestIdsChange}
         onProgramStatusChange={onProgramStatusChange}
+        onProgramAudioMutedChange={onProgramAudioMutedChange}
         onSlideControlAuthorizedChange={onSlideControlAuthorizedChange}
         pendingSlideCommand={pendingSlideCommand}
         onSlideCommandSent={onSlideCommandSent}

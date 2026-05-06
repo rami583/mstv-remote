@@ -1336,6 +1336,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             room,
             globalReturnSource,
             programGuestIds,
+            programMutedGuestIds,
             slideControlEnabledGuestIds,
             guestReturnOverrides,
             routingVersion: Date.parse(productionSnapshot.updatedAt) || Date.now()
@@ -1345,6 +1346,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       globalReturnSource,
       guestReturnOverrides,
       productionSnapshot,
+      programMutedGuestIds,
       programGuestIds,
       room,
       slideControlEnabledGuestIds
