@@ -1116,6 +1116,27 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }, [programRecordingStatus.startedAt, programRecordingStatus.state]);
 
   useEffect(() => {
+    if (!programRecordingStatus.filePath || programRecordingStatus.state !== "idle") {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setProgramRecordingStatus((current) =>
+        current.state === "idle" && current.filePath === programRecordingStatus.filePath
+          ? {
+              state: "idle",
+              startedAt: null
+            }
+          : current
+      );
+    }, 5000);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [programRecordingStatus.filePath, programRecordingStatus.state]);
+
+  useEffect(() => {
     window.localStorage.setItem("mstv.programAudioOutputDeviceId", programAudioOutputDeviceId);
   }, [programAudioOutputDeviceId]);
 
