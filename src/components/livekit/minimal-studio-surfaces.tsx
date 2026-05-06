@@ -45,6 +45,7 @@ interface ProgramReturnSurfaceProps extends BaseSessionProps {
   onProgramGuestIdsChange?: (programGuestIds: string[]) => void;
   onProgramStatusChange?: (isInProgram: boolean) => void;
   onProgramAudioMutedChange?: (isMuted: boolean) => void;
+  onRegieAudioMutedChange?: (isMuted: boolean) => void;
   onSlideControlAuthorizedChange?: (authorized: boolean) => void;
   pendingSlideCommand?: PendingSlideControlCommand | null;
   onSlideCommandSent?: (commandId: string) => void;
@@ -70,12 +71,14 @@ interface ControlGuestGridSurfaceProps extends BaseSessionProps {
     effectiveReturnSource: ReturnSource;
     connectionQuality: RuntimeParticipantState["connectionQuality"];
     programAudioMuted: boolean;
+    regieAudioMuted: boolean;
     returnSourceControlDisabled: boolean;
     disconnectControlDisabled: boolean;
     slideControlEnabled: boolean;
   }>;
   onToggleGuest: (participantId: string) => void;
   onToggleProgramAudioMute?: (participantId: string) => void;
+  onToggleRegieAudioMute?: (participantId: string) => void;
   onToggleGuestSlideControl?: (participantId: string) => void;
   onSelectGuestReturnSource?: (participantId: string, source: ReturnSource) => void;
   onDisconnectGuest?: (participantId: string) => void;
@@ -109,6 +112,7 @@ interface ProgramReturnRoutingPayload {
   globalReturnSource: ReturnSource;
   programGuestIds: string[];
   programMutedGuestIds?: string[];
+  regieMutedGuestIds?: string[];
   slideControlEnabledGuestIds?: string[];
   guestReturnOverrides: Record<string, ReturnSource | undefined>;
   routingVersion: number;
@@ -351,6 +355,7 @@ function ProgramReturnContent({
   onProgramGuestIdsChange,
   onProgramStatusChange,
   onProgramAudioMutedChange,
+  onRegieAudioMutedChange,
   onSlideControlAuthorizedChange,
   pendingSlideCommand,
   onSlideCommandSent
@@ -362,6 +367,7 @@ function ProgramReturnContent({
   onProgramGuestIdsChange?: (programGuestIds: string[]) => void;
   onProgramStatusChange?: (isInProgram: boolean) => void;
   onProgramAudioMutedChange?: (isMuted: boolean) => void;
+  onRegieAudioMutedChange?: (isMuted: boolean) => void;
   onSlideControlAuthorizedChange?: (authorized: boolean) => void;
   pendingSlideCommand?: PendingSlideControlCommand | null;
   onSlideCommandSent?: (commandId: string) => void;
@@ -451,6 +457,10 @@ function ProgramReturnContent({
       onProgramAudioMutedChange?.(localMetadata.programAudioMuted);
     }
 
+    if (typeof localMetadata?.regieAudioMuted === "boolean") {
+      onRegieAudioMutedChange?.(localMetadata.regieAudioMuted);
+    }
+
     if (typeof localMetadata?.canControlSlides === "boolean") {
       onSlideControlAuthorizedChange?.(localMetadata.canControlSlides);
     }
@@ -458,7 +468,9 @@ function ProgramReturnContent({
     localMetadata?.canControlSlides,
     localMetadata?.isInProgram,
     localMetadata?.programAudioMuted,
+    localMetadata?.regieAudioMuted,
     onProgramAudioMutedChange,
+    onRegieAudioMutedChange,
     onProgramStatusChange,
     onSlideControlAuthorizedChange
   ]);
@@ -488,8 +500,12 @@ function ProgramReturnContent({
         const nextProgramAudioMuted = (parsed.programMutedGuestIds ?? []).some((participantId) =>
           possibleProgramStatusIds.has(participantId)
         );
+        const nextRegieAudioMuted = (parsed.regieMutedGuestIds ?? []).some((participantId) =>
+          possibleProgramStatusIds.has(participantId)
+        );
         onProgramStatusChange?.(nextIsInProgram);
         onProgramAudioMutedChange?.(nextProgramAudioMuted);
+        onRegieAudioMutedChange?.(nextRegieAudioMuted);
         onSlideControlAuthorizedChange?.(nextCanControlSlides);
 
         const nextSource = nextIsInProgram
@@ -525,6 +541,7 @@ function ProgramReturnContent({
     onProgramGuestIdsChange,
     onAssignedReturnSourceChange,
     onProgramAudioMutedChange,
+    onRegieAudioMutedChange,
     onProgramStatusChange,
     onSlideControlAuthorizedChange,
     possibleProgramStatusIds,
@@ -1200,6 +1217,7 @@ function ControlGuestGridContent({
   guests,
   onToggleGuest,
   onToggleProgramAudioMute,
+  onToggleRegieAudioMute,
   onToggleGuestSlideControl,
   onSelectGuestReturnSource,
   onDisconnectGuest,
@@ -1213,6 +1231,7 @@ function ControlGuestGridContent({
   | "guests"
   | "onToggleGuest"
   | "onToggleProgramAudioMute"
+  | "onToggleRegieAudioMute"
   | "onToggleGuestSlideControl"
   | "onSelectGuestReturnSource"
   | "onDisconnectGuest"
@@ -1248,7 +1267,10 @@ function ControlGuestGridContent({
     .map((guest) => participantAudioTrackMap.get(guest.participantId))
     .filter((trackRef): trackRef is TrackReference => trackRef !== undefined);
   const regieMonitorAudioTracks = guests
-    .filter((guest) => !guest.inProgram && guest.effectiveReturnSource === "REGIE")
+    .filter(
+      (guest) =>
+        !guest.inProgram && guest.effectiveReturnSource === "REGIE" && !guest.regieAudioMuted
+    )
     .map((guest) => participantAudioTrackMap.get(guest.participantId))
     .filter((trackRef): trackRef is TrackReference => trackRef !== undefined);
   const presentGuests = useMemo(
@@ -1338,6 +1360,7 @@ function ControlGuestGridContent({
       <div className={gridClassName ?? "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))]"}>
         {guests.map((guest) => {
         const trackRef = participantTrackMap.get(guest.participantId);
+        const isActiveInRegie = !guest.inProgram && guest.effectiveReturnSource === "REGIE";
         const selectionLimitReached = !guest.inProgram && guests.filter((item) => item.inProgram).length >= 3;
         const activeActionPillClassName =
           "border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
@@ -1394,21 +1417,29 @@ function ControlGuestGridContent({
               <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
               <div className="pointer-events-none absolute left-4 top-4 z-20 flex gap-2">
-                {guest.inProgram ? (
+                {guest.inProgram || isActiveInRegie ? (
                   <button
                     type="button"
-                    aria-pressed={!guest.programAudioMuted}
+                    aria-pressed={guest.inProgram ? !guest.programAudioMuted : !guest.regieAudioMuted}
                     title={
-                      guest.programAudioMuted
-                        ? "Réactiver le micro dans le Program"
-                        : "Couper le micro dans le Program"
+                      guest.inProgram
+                        ? guest.programAudioMuted
+                          ? "Réactiver le micro dans le Program"
+                          : "Couper le micro dans le Program"
+                        : guest.regieAudioMuted
+                          ? "Réactiver le micro dans la Régie"
+                          : "Couper le micro dans la Régie"
                     }
                     onClick={(event) => {
                       event.stopPropagation();
-                      onToggleProgramAudioMute?.(guest.participantId);
+                      if (guest.inProgram) {
+                        onToggleProgramAudioMute?.(guest.participantId);
+                      } else {
+                        onToggleRegieAudioMute?.(guest.participantId);
+                      }
                     }}
                     className={`${pillBaseClassName} pointer-events-auto transition ${
-                      guest.programAudioMuted
+                      (guest.inProgram ? guest.programAudioMuted : guest.regieAudioMuted)
                         ? getIndicatorClasses("red")
                         : getIndicatorClasses("green")
                     }`}
@@ -1572,6 +1603,7 @@ export function GuestProgramReturnSurface({
   onProgramGuestIdsChange,
   onProgramStatusChange,
   onProgramAudioMutedChange,
+  onRegieAudioMutedChange,
   onSlideControlAuthorizedChange,
   pendingSlideCommand,
   onSlideCommandSent,
@@ -1593,6 +1625,7 @@ export function GuestProgramReturnSurface({
         onProgramGuestIdsChange={onProgramGuestIdsChange}
         onProgramStatusChange={onProgramStatusChange}
         onProgramAudioMutedChange={onProgramAudioMutedChange}
+        onRegieAudioMutedChange={onRegieAudioMutedChange}
         onSlideControlAuthorizedChange={onSlideControlAuthorizedChange}
         pendingSlideCommand={pendingSlideCommand}
         onSlideCommandSent={onSlideCommandSent}
@@ -1651,6 +1684,7 @@ export function ControlGuestGridSurface({
   guests,
   onToggleGuest,
   onToggleProgramAudioMute,
+  onToggleRegieAudioMute,
   onToggleGuestSlideControl,
   onSelectGuestReturnSource,
   onDisconnectGuest,
@@ -1673,6 +1707,7 @@ export function ControlGuestGridSurface({
         guests={guests}
         onToggleGuest={onToggleGuest}
         onToggleProgramAudioMute={onToggleProgramAudioMute}
+        onToggleRegieAudioMute={onToggleRegieAudioMute}
         onToggleGuestSlideControl={onToggleGuestSlideControl}
         onSelectGuestReturnSource={onSelectGuestReturnSource}
         onDisconnectGuest={onDisconnectGuest}

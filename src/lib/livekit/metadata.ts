@@ -10,6 +10,7 @@ export interface ParticipantMetadata {
   assignedReturnSource?: ReturnSource | null;
   isInProgram?: boolean | null;
   programAudioMuted?: boolean | null;
+  regieAudioMuted?: boolean | null;
   canControlSlides?: boolean | null;
   returnRoutingVersion?: number | null;
 }

@@ -12,7 +12,8 @@ import { fetchLiveKitToken } from "@/lib/livekit/browser-token";
 import { buildParticipantIdentity } from "@/lib/livekit/identity";
 import {
   computeAudioIndicator,
-  computeVideoIndicator
+  computeVideoIndicator,
+  type MediaStatusIndicator
 } from "@/lib/studio/media-status";
 import {
   fetchProductionSnapshot,
@@ -682,6 +683,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [productionSnapshot, setProductionSnapshot] = useState<ProductionSnapshot | null>(null);
   const [programGuestIds, setProgramGuestIds] = useState<string[]>([]);
   const [programMutedGuestIds, setProgramMutedGuestIds] = useState<string[]>([]);
+  const [regieMutedGuestIds, setRegieMutedGuestIds] = useState<string[]>([]);
   const [pipModeEnabled, setPipModeEnabled] = useState(false);
   const [slideControlEnabledGuestIds, setSlideControlEnabledGuestIds] = useState<string[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceOption[]>([]);
@@ -1243,6 +1245,20 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             globalReturnSource,
             guestReturnOverrides
           });
+          const isActiveInRegie = !inProgram && effectiveReturnSource === "REGIE";
+          const regieAudioMuted = regieMutedGuestIds.includes(guest.participantId);
+          const activeRegieIndicator: MediaStatusIndicator = {
+            tone: "green",
+            label: "LIVE",
+            detail: "LIVE",
+            description: "Active in Régie monitoring."
+          };
+          const mutedRegieIndicator: MediaStatusIndicator = {
+            tone: "red",
+            label: "MUTED",
+            detail: "MUTED_REGIE",
+            description: "Muted from Régie monitoring."
+          };
 
           return {
             participantId: guest.participantId,
@@ -1253,17 +1269,24 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             connectionQuality:
               liveGuestStatesById.get(guest.participantId)?.connectionQuality ?? "unknown",
             programAudioMuted: programMutedGuestIds.includes(guest.participantId),
+            regieAudioMuted,
             returnSourceControlDisabled: inProgram,
             disconnectControlDisabled: inProgram,
             slideControlEnabled: slideControlEnabledGuestIds.includes(guest.participantId),
-            cameraIndicator: computeVideoIndicator({
-              inProgram,
-              trackState: guest.cameraTrackState
-            }),
-            microphoneIndicator: computeAudioIndicator({
-              inProgram,
-              trackState: guest.microphoneTrackState
-            })
+            cameraIndicator: isActiveInRegie
+              ? activeRegieIndicator
+              : computeVideoIndicator({
+                  inProgram,
+                  trackState: guest.cameraTrackState
+                }),
+            microphoneIndicator: isActiveInRegie
+              ? regieAudioMuted
+                ? mutedRegieIndicator
+                : activeRegieIndicator
+              : computeAudioIndicator({
+                  inProgram,
+                  trackState: guest.microphoneTrackState
+                })
           };
         });
     },
@@ -1274,6 +1297,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       presentGuestIds,
       productionSnapshot?.participants,
       programMutedGuestIds,
+      regieMutedGuestIds,
       programGuestIds,
       room,
       slideControlEnabledGuestIds
@@ -1281,6 +1305,13 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   );
   const visuallyActiveReturnSources = useMemo(
     () => new Set<ReturnSource>(guests.map((guest) => guest.effectiveReturnSource)),
+    [guests]
+  );
+  const activeRegieGuestIds = useMemo(
+    () =>
+      guests
+        .filter((guest) => !guest.inProgram && guest.effectiveReturnSource === "REGIE")
+        .map((guest) => guest.participantId),
     [guests]
   );
   const studioInputStatuses = {
@@ -1328,6 +1359,15 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     });
   }, []);
 
+  useEffect(() => {
+    const activeRegieGuestIdSet = new Set(activeRegieGuestIds);
+
+    setRegieMutedGuestIds((current) => {
+      const next = current.filter((participantId) => activeRegieGuestIdSet.has(participantId));
+      return areGuestListsEqual(current, next) ? current : next;
+    });
+  }, [activeRegieGuestIds]);
+
   const routingPayload = useMemo(
     () =>
       productionSnapshot
@@ -1337,6 +1377,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             globalReturnSource,
             programGuestIds,
             programMutedGuestIds,
+            regieMutedGuestIds,
             slideControlEnabledGuestIds,
             guestReturnOverrides,
             routingVersion: Date.parse(productionSnapshot.updatedAt) || Date.now()
@@ -1347,6 +1388,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       guestReturnOverrides,
       productionSnapshot,
       programMutedGuestIds,
+      regieMutedGuestIds,
       programGuestIds,
       room,
       slideControlEnabledGuestIds
@@ -1542,6 +1584,18 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     }
 
     setProgramMutedGuestIds((current) =>
+      current.includes(participantId)
+        ? current.filter((id) => id !== participantId)
+        : [...current, participantId]
+    );
+  }
+
+  function handleToggleRegieAudioMute(participantId: string) {
+    if (!activeRegieGuestIds.includes(participantId)) {
+      return;
+    }
+
+    setRegieMutedGuestIds((current) =>
       current.includes(participantId)
         ? current.filter((id) => id !== participantId)
         : [...current, participantId]
@@ -2198,6 +2252,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           guests={guests}
           onToggleGuest={handleToggleGuest}
           onToggleProgramAudioMute={handleToggleProgramAudioMute}
+          onToggleRegieAudioMute={handleToggleRegieAudioMute}
           onToggleGuestSlideControl={handleToggleGuestSlideControl}
           onSelectGuestReturnSource={handleSelectGuestReturnSource}
           onDisconnectGuest={handleDisconnectGuest}

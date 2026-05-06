@@ -139,6 +139,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
   const [liveProgramGuestIds, setLiveProgramGuestIds] = useState<string[] | null>(null);
   const [liveProgramStatus, setLiveProgramStatus] = useState<boolean | null>(null);
   const [liveProgramAudioMuted, setLiveProgramAudioMuted] = useState(false);
+  const [liveRegieAudioMuted, setLiveRegieAudioMuted] = useState(false);
   const [liveAssignedReturnSource, setLiveAssignedReturnSource] = useState<ReturnSource | null>(null);
   const [slideControlAuthorized, setSlideControlAuthorized] = useState(false);
   const [pendingSlideCommand, setPendingSlideCommand] =
@@ -406,7 +407,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
   const isGuestActiveForControlRoom = isInProgram || assignedReturnSource === "REGIE";
   const guestMicActiveForControlRoom = isInProgram
     ? !liveProgramAudioMuted
-    : assignedReturnSource === "REGIE";
+    : assignedReturnSource === "REGIE" && !liveRegieAudioMuted;
   const guestMicStatusIndicator: MediaStatusIndicator = guestMicActiveForControlRoom
     ? {
         tone: "green",
@@ -652,6 +653,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
             onProgramGuestIdsChange={handleProgramGuestIdsChange}
             onProgramStatusChange={setLiveProgramStatus}
             onProgramAudioMutedChange={setLiveProgramAudioMuted}
+            onRegieAudioMutedChange={setLiveRegieAudioMuted}
             onSlideControlAuthorizedChange={setSlideControlAuthorized}
             pendingSlideCommand={pendingSlideCommand}
             onSlideCommandSent={(commandId) => {
