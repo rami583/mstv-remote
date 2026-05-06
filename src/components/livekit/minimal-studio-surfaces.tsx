@@ -2310,49 +2310,54 @@ function ControlGuestGridContent({
 
               {chatIsOpen ? (
                 <div
-                  className="absolute right-4 top-16 z-40 w-[min(20rem,calc(100%-2rem))] rounded-2xl border border-white/10 bg-black/85 p-3 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-md"
+                  className="absolute inset-0 z-50 flex flex-col rounded-[22px] border border-white/10 bg-black/95 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.55)] backdrop-blur-md"
                   onClick={(event) => event.stopPropagation()}
                   onPointerDown={(event) => event.stopPropagation()}
                   onKeyDown={(event) => event.stopPropagation()}
                 >
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white">
-                      Chat
-                    </p>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                        Chat privé
+                      </p>
+                      <p className="truncate text-base font-semibold text-white" title={guest.displayName}>
+                        {guest.displayName}
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      className="rounded-full bg-slate-700 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-slate-500"
+                      className={`${pillBaseClassName} border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition hover:bg-slate-500`}
                       onClick={() => setActiveChatGuestId(null)}
                     >
-                      Fermer
+                      Retour
                     </button>
                   </div>
-                  <div className="mb-2 max-h-28 space-y-1.5 overflow-y-auto pr-1">
+                  <div className="mb-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                     {chatMessages.length > 0 ? (
-                      chatMessages.slice(-5).map((message) => (
+                      chatMessages.map((message) => (
                         <div
                           key={message.messageId}
-                          className={`rounded-xl px-2.5 py-1.5 text-[11px] ${
+                          className={`rounded-2xl px-3 py-2 text-xs ${
                             message.fromRole === "control"
-                              ? "ml-4 bg-sky-500 text-white"
-                              : "mr-4 bg-white/10 text-slate-100"
+                              ? "ml-8 bg-sky-500 text-white"
+                              : "mr-8 bg-white/10 text-slate-100"
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2 text-[9px] font-bold uppercase tracking-[0.12em] opacity-75">
                             <span>{message.fromRole === "control" ? "Régie" : "Invité"}</span>
                             <span>{formatChatTime(message.createdAt)}</span>
                           </div>
-                          <p className="mt-0.5 leading-snug">{message.body}</p>
+                          <p className="mt-1 leading-snug">{message.body}</p>
                         </div>
                       ))
                     ) : (
-                      <p className="rounded-xl bg-white/5 px-2.5 py-2 text-[11px] text-slate-400">
+                      <div className="flex h-full items-center justify-center rounded-2xl bg-white/5 px-3 py-2 text-xs text-slate-400">
                         Aucun message.
-                      </p>
+                      </div>
                     )}
                   </div>
                   <form
-                    className="flex gap-1.5"
+                    className="flex gap-2"
                     onSubmit={(event) => {
                       event.preventDefault();
                       handleSendControlChatMessage(guest.participantId, guest.displayName);
@@ -2368,11 +2373,11 @@ function ControlGuestGridContent({
                         }));
                       }}
                       placeholder="Message..."
-                      className="min-w-0 flex-1 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] text-white outline-none placeholder:text-slate-500 focus:border-sky-400"
+                      className="min-w-0 flex-1 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white outline-none placeholder:text-slate-500 focus:border-sky-400"
                     />
                     <button
                       type="submit"
-                      className="rounded-full bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-sky-400"
+                      className={`${pillBaseClassName} border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition hover:bg-sky-400`}
                     >
                       Envoyer
                     </button>
@@ -2423,13 +2428,18 @@ function ControlGuestGridContent({
                           event.stopPropagation();
                           handleOpenGuestChat(guest.participantId);
                         }}
-                        className={`${pillBaseClassName} transition ${
+                        className={`${pillBaseClassName} relative transition ${
                           chatIsOpen || unreadChatCount > 0
                             ? activeActionPillClassName
                             : neutralPillClassName
                         }`}
                       >
-                        {unreadChatCount > 0 ? `Chat ${unreadChatCount}` : "Chat"}
+                        Chat
+                        {unreadChatCount > 0 ? (
+                          <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d4301f] px-1.5 text-[10px] font-bold leading-none text-white shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
+                            {unreadChatCount}
+                          </span>
+                        ) : null}
                       </button>
                       <button
                         type="button"

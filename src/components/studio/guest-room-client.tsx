@@ -795,10 +795,10 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
             </div>
           ) : null}
 
-          <div className="absolute left-2 top-2 z-30 w-[min(320px,calc(100%-1rem))] md:left-3 md:top-3">
+          <div className="absolute left-2 top-2 bottom-2 z-30 w-[min(380px,calc(100%-1rem))] md:left-3 md:top-3 md:bottom-3">
             {privateChatOpen ? (
-              <div className="rounded-2xl border border-white/10 bg-black/80 p-3 shadow-[0_18px_48px_rgba(0,0,0,0.35)] backdrop-blur-md">
-                <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-black/85 p-3 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-md">
+                <div className="mb-3 flex items-center justify-between gap-2">
                   <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white">
                     Chat régie
                   </p>
@@ -810,12 +810,12 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                     Réduire
                   </button>
                 </div>
-                <div className="mb-2 max-h-28 space-y-1.5 overflow-y-auto pr-1">
+                <div className="mb-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                   {privateChatMessages.length > 0 ? (
-                    privateChatMessages.slice(-5).map((message) => (
+                    privateChatMessages.map((message) => (
                       <div
                         key={message.messageId}
-                        className={`rounded-xl px-2.5 py-1.5 text-[11px] ${
+                        className={`rounded-2xl px-3 py-2 text-xs ${
                           message.fromRole === "guest"
                             ? "ml-4 bg-sky-500 text-white"
                             : "mr-4 bg-white/10 text-slate-100"
@@ -829,7 +829,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                       </div>
                     ))
                   ) : (
-                    <p className="rounded-xl bg-white/5 px-2.5 py-2 text-[11px] text-slate-400">
+                    <p className="flex h-full items-center justify-center rounded-2xl bg-white/5 px-3 py-2 text-xs text-slate-400">
                       Aucun message.
                     </p>
                   )}
@@ -859,9 +859,14 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               <button
                 type="button"
                 onClick={handleTogglePrivateChat}
-                className="rounded-full border border-transparent bg-slate-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition hover:bg-slate-500"
+                className="relative rounded-full border border-transparent bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition hover:bg-sky-400"
               >
-                {privateChatUnreadCount > 0 ? `Chat ${privateChatUnreadCount}` : "Chat"}
+                Chat
+                {privateChatUnreadCount > 0 ? (
+                  <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d4301f] px-1.5 text-[10px] font-bold leading-none text-white shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
+                    {privateChatUnreadCount}
+                  </span>
+                ) : null}
               </button>
             )}
           </div>
