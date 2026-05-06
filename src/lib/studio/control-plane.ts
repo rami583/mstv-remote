@@ -1,5 +1,6 @@
 import type { StudioMessage } from "@/lib/types/messaging";
 import type {
+  GuestVideoFraming,
   ProductionParticipantState,
   ProductionSnapshot,
   ReturnSource,
@@ -47,6 +48,34 @@ export async function updateProgramScene(room: string, guestIds: string[]) {
   }
 
   return (await response.json()) as { room: string; guestIds: string[] };
+}
+
+export async function updateGuestVideoFraming(
+  room: string,
+  guestId: string,
+  framing: GuestVideoFraming
+) {
+  const response = await fetch(`/api/production/${encodeURIComponent(room)}/scene`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      guestVideoFraming: {
+        guestId,
+        framing
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to update guest framing.");
+  }
+
+  return (await response.json()) as {
+    room: string;
+    guestVideoFraming: Record<string, GuestVideoFraming | undefined>;
+  };
 }
 
 export async function updateGlobalReturnSource(room: string, source: ReturnSource) {

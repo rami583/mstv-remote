@@ -5,6 +5,7 @@ import {
   ControlGuestGridSurface,
   ControlProgramRoutingBridge,
   ControlReturnFeedPublisher,
+  type GuestVideoFramingAction,
   type ProgramRecordingCommand,
   type ProgramRecordingStatus,
   type ReturnFeedPublisherDebugState,
@@ -21,12 +22,14 @@ import {
 import {
   fetchProductionSnapshot,
   disconnectGuest,
+  updateGuestVideoFraming,
   updateGlobalReturnSource,
   updateGuestReturnOverride,
   updateProgramScene
 } from "@/lib/studio/control-plane";
 import type { TokenResponsePayload } from "@/lib/types/livekit";
 import type {
+  GuestVideoFraming,
   ProductionParticipantState,
   ProductionSnapshot,
   ReturnSource,
@@ -575,6 +578,45 @@ function getEffectiveReturnSource(input: {
   }
 
   return input.guestReturnOverrides[input.guestId] ?? input.globalReturnSource;
+}
+
+const defaultGuestVideoFraming: GuestVideoFraming = {
+  zoom: 1,
+  x: 0,
+  y: 0
+};
+
+function clampGuestVideoFraming(framing: GuestVideoFraming): GuestVideoFraming {
+  return {
+    zoom: Math.max(1, Math.min(2, Number(framing.zoom.toFixed(2)))),
+    x: Math.max(-50, Math.min(50, Number(framing.x.toFixed(1)))),
+    y: Math.max(-50, Math.min(50, Number(framing.y.toFixed(1))))
+  };
+}
+
+function getNextGuestVideoFraming(
+  current: GuestVideoFraming | undefined,
+  action: GuestVideoFramingAction
+) {
+  const base = current ?? defaultGuestVideoFraming;
+  const positionStep = 3;
+
+  switch (action) {
+    case "zoom-in":
+      return clampGuestVideoFraming({ ...base, zoom: base.zoom + 0.1 });
+    case "zoom-out":
+      return clampGuestVideoFraming({ ...base, zoom: base.zoom - 0.1 });
+    case "up":
+      return clampGuestVideoFraming({ ...base, y: base.y - positionStep });
+    case "down":
+      return clampGuestVideoFraming({ ...base, y: base.y + positionStep });
+    case "left":
+      return clampGuestVideoFraming({ ...base, x: base.x - positionStep });
+    case "right":
+      return clampGuestVideoFraming({ ...base, x: base.x + positionStep });
+    case "reset":
+      return defaultGuestVideoFraming;
+  }
 }
 
 function getSingleEffectiveReturnSource(input: {
@@ -1354,6 +1396,9 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             inProgram,
             selectionOrder: inProgram ? selectionOrder + 1 : null,
             effectiveReturnSource,
+            videoFraming:
+              productionSnapshot?.guestVideoFraming?.[guest.participantId] ??
+              defaultGuestVideoFraming,
             connectionQuality:
               liveGuestStatesById.get(guest.participantId)?.connectionQuality ?? "unknown",
             programAudioMuted: programMutedGuestIds.includes(guest.participantId),
@@ -1383,6 +1428,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       guestReturnOverrides,
       liveGuestStates,
       presentGuestIds,
+      productionSnapshot?.guestVideoFraming,
       productionSnapshot?.participants,
       programMutedGuestIds,
       regieMutedGuestIds,
@@ -1719,6 +1765,29 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         ? current.filter((guestId) => guestId !== participantId)
         : [...current, participantId]
     );
+  }
+
+  function handleAdjustGuestVideoFraming(
+    participantId: string,
+    action: GuestVideoFramingAction
+  ) {
+    const currentFraming =
+      productionSnapshot?.guestVideoFraming?.[participantId] ?? defaultGuestVideoFraming;
+    const nextFraming = getNextGuestVideoFraming(currentFraming, action);
+
+    updateLocalProductionSnapshot((snapshot) => ({
+      ...snapshot,
+      guestVideoFraming: {
+        ...(snapshot.guestVideoFraming ?? {}),
+        [participantId]: nextFraming
+      }
+    }));
+
+    void updateGuestVideoFraming(room, participantId, nextFraming).catch((updateError) => {
+      setError(
+        updateError instanceof Error ? updateError.message : "Unable to update guest framing."
+      );
+    });
   }
 
   const forwardSlideCommandToReceiver = useCallback(
@@ -2417,6 +2486,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           onToggleProgramAudioMute={handleToggleProgramAudioMute}
           onToggleRegieAudioMute={handleToggleRegieAudioMute}
           onToggleGuestSlideControl={handleToggleGuestSlideControl}
+          onAdjustGuestVideoFraming={handleAdjustGuestVideoFraming}
           onSelectGuestReturnSource={handleSelectGuestReturnSource}
           onDisconnectGuest={handleDisconnectGuest}
           onPresentGuestIdsChange={handlePresentGuestIdsChange}

@@ -18,6 +18,7 @@ import { parseParticipantMetadata } from "@/lib/livekit/metadata";
 import { getIndicatorClasses, type MediaStatusIndicator } from "@/lib/studio/media-status";
 import type { TokenResponsePayload } from "@/lib/types/livekit";
 import type {
+  GuestVideoFraming,
   LiveRoomSnapshot,
   PendingSlideControlCommand,
   ReturnSource,
@@ -59,6 +60,7 @@ interface ProgramRoutingBridgeProps extends BaseSessionProps {
 
 interface ProgramOutputSurfaceProps extends BaseSessionProps {
   programGuestIds: string[];
+  guestVideoFraming?: Record<string, GuestVideoFraming | undefined>;
 }
 
 interface ControlGuestGridSurfaceProps extends BaseSessionProps {
@@ -76,11 +78,13 @@ interface ControlGuestGridSurfaceProps extends BaseSessionProps {
     returnSourceControlDisabled: boolean;
     disconnectControlDisabled: boolean;
     slideControlEnabled: boolean;
+    videoFraming: GuestVideoFraming;
   }>;
   onToggleGuest: (participantId: string) => void;
   onToggleProgramAudioMute?: (participantId: string) => void;
   onToggleRegieAudioMute?: (participantId: string) => void;
   onToggleGuestSlideControl?: (participantId: string) => void;
+  onAdjustGuestVideoFraming?: (participantId: string, action: GuestVideoFramingAction) => void;
   onSelectGuestReturnSource?: (participantId: string, source: ReturnSource) => void;
   onDisconnectGuest?: (participantId: string) => void;
   onPresentGuestIdsChange?: (participantIds: string[]) => void;
@@ -90,6 +94,23 @@ interface ControlGuestGridSurfaceProps extends BaseSessionProps {
   programAudioOutputDeviceId?: string | null;
   regieMonitorOutputDeviceId?: string | null;
   gridClassName?: string;
+}
+
+export type GuestVideoFramingAction = "zoom-in" | "zoom-out" | "up" | "down" | "left" | "right" | "reset";
+
+const defaultGuestVideoFraming: GuestVideoFraming = {
+  zoom: 1,
+  x: 0,
+  y: 0
+};
+
+function getVideoFramingTransform(framing?: GuestVideoFraming) {
+  const nextFraming = framing ?? defaultGuestVideoFraming;
+
+  return {
+    transform: `translate(${nextFraming.x}%, ${nextFraming.y}%) scale(${nextFraming.zoom})`,
+    transformOrigin: "center"
+  };
 }
 
 export interface ReturnFeedPublisherState {
@@ -858,7 +879,8 @@ function drawVideoCover(
   x: number,
   y: number,
   width: number,
-  height: number
+  height: number,
+  framing?: GuestVideoFraming
 ) {
   const sourceWidth = video.videoWidth;
   const sourceHeight = video.videoHeight;
@@ -882,6 +904,27 @@ function drawVideoCover(
   } else {
     cropHeight = sourceWidth / targetRatio;
     cropY = (sourceHeight - cropHeight) / 2;
+  }
+
+  if (framing) {
+    const zoom = Math.max(1, Math.min(2, framing.zoom));
+    const zoomedCropWidth = cropWidth / zoom;
+    const zoomedCropHeight = cropHeight / zoom;
+    const maxCropX = sourceWidth - zoomedCropWidth;
+    const maxCropY = sourceHeight - zoomedCropHeight;
+
+    cropX =
+      cropX +
+      (cropWidth - zoomedCropWidth) / 2 -
+      (Math.max(-50, Math.min(50, framing.x)) / 100) * zoomedCropWidth;
+    cropY =
+      cropY +
+      (cropHeight - zoomedCropHeight) / 2 -
+      (Math.max(-50, Math.min(50, framing.y)) / 100) * zoomedCropHeight;
+    cropWidth = zoomedCropWidth;
+    cropHeight = zoomedCropHeight;
+    cropX = Math.max(0, Math.min(maxCropX, cropX));
+    cropY = Math.max(0, Math.min(maxCropY, cropY));
   }
 
   context.drawImage(video, cropX, cropY, cropWidth, cropHeight, x, y, width, height);
@@ -1020,7 +1063,7 @@ function ProgramRecordingBridge({
       const video = videoElementsRef.current.get(guest.participantId);
 
       if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-        drawVideoCover(context, video, x, 0, width, canvas.height);
+        drawVideoCover(context, video, x, 0, width, canvas.height, guest.videoFraming);
       } else {
         context.fillStyle = "#000000";
         context.fillRect(x, 0, width, canvas.height);
@@ -1291,7 +1334,33 @@ function ProgramRecordingBridge({
   );
 }
 
-function ProgramOutputContent({ programGuestIds }: { programGuestIds: string[] }) {
+function ProgramVideoSlot({
+  trackRef,
+  framing
+}: {
+  trackRef?: TrackReference;
+  framing?: GuestVideoFraming;
+}) {
+  return (
+    <div className="h-full w-full overflow-hidden bg-black">
+      {trackRef ? (
+        <VideoTrack
+          trackRef={trackRef}
+          className="h-full w-full object-cover object-center"
+          style={getVideoFramingTransform(framing)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ProgramOutputContent({
+  programGuestIds,
+  guestVideoFraming = {}
+}: {
+  programGuestIds: string[];
+  guestVideoFraming?: Record<string, GuestVideoFraming | undefined>;
+}) {
   const { selectedVideoSlots } = useSelectedProgramMedia(programGuestIds);
 
   if (selectedVideoSlots.length === 0) {
@@ -1299,13 +1368,11 @@ function ProgramOutputContent({ programGuestIds }: { programGuestIds: string[] }
   }
 
   if (selectedVideoSlots.length === 1) {
-    return selectedVideoSlots[0].trackRef ? (
-      <VideoTrack
+    return (
+      <ProgramVideoSlot
         trackRef={selectedVideoSlots[0].trackRef}
-        className="h-full w-full object-cover object-center"
+        framing={guestVideoFraming[selectedVideoSlots[0].participantId]}
       />
-    ) : (
-      <div className="h-full w-full bg-black" />
     );
   }
 
@@ -1314,14 +1381,11 @@ function ProgramOutputContent({ programGuestIds }: { programGuestIds: string[] }
       <div className="relative h-full w-full bg-black">
         <div className="grid h-full w-full grid-cols-2 bg-black">
           {selectedVideoSlots.map((slot) => (
-            <div key={slot.participantId} className="h-full w-full bg-black">
-              {slot.trackRef ? (
-                <VideoTrack
-                  trackRef={slot.trackRef}
-                  className="h-full w-full object-cover object-center"
-                />
-              ) : null}
-            </div>
+            <ProgramVideoSlot
+              key={slot.participantId}
+              trackRef={slot.trackRef}
+              framing={guestVideoFraming[slot.participantId]}
+            />
           ))}
         </div>
         <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-[5px] -translate-x-1/2 bg-white" />
@@ -1333,14 +1397,11 @@ function ProgramOutputContent({ programGuestIds }: { programGuestIds: string[] }
     <div className="relative h-full w-full bg-black">
       <div className="grid h-full w-full grid-cols-3 bg-black">
         {selectedVideoSlots.map((slot) => (
-          <div key={slot.participantId} className="h-full w-full bg-black">
-            {slot.trackRef ? (
-              <VideoTrack
-                trackRef={slot.trackRef}
-                className="h-full w-full object-cover object-center"
-              />
-            ) : null}
-          </div>
+          <ProgramVideoSlot
+            key={slot.participantId}
+            trackRef={slot.trackRef}
+            framing={guestVideoFraming[slot.participantId]}
+          />
         ))}
       </div>
       <div className="pointer-events-none absolute inset-y-0 left-1/3 z-10 w-[5px] -translate-x-1/2 bg-white" />
@@ -1715,6 +1776,7 @@ function ControlGuestGridContent({
   onToggleProgramAudioMute,
   onToggleRegieAudioMute,
   onToggleGuestSlideControl,
+  onAdjustGuestVideoFraming,
   onSelectGuestReturnSource,
   onDisconnectGuest,
   onPresentGuestIdsChange,
@@ -1731,6 +1793,7 @@ function ControlGuestGridContent({
   | "onToggleProgramAudioMute"
   | "onToggleRegieAudioMute"
   | "onToggleGuestSlideControl"
+  | "onAdjustGuestVideoFraming"
   | "onSelectGuestReturnSource"
   | "onDisconnectGuest"
   | "onPresentGuestIdsChange"
@@ -1923,6 +1986,7 @@ function ControlGuestGridContent({
                 <VideoTrack
                   trackRef={trackRef}
                   className="h-full w-full object-cover object-center pointer-events-none"
+                  style={getVideoFramingTransform(guest.videoFraming)}
                 />
               ) : (
                 <div className="h-full w-full bg-black pointer-events-none" />
@@ -1930,6 +1994,40 @@ function ControlGuestGridContent({
 
               <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
               <AudioLevelMeter track={audibleAudioTrack} />
+              <div
+                className="absolute left-4 top-1/2 z-30 grid -translate-y-1/2 grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-black/55 p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-sm"
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                {[
+                  { action: "zoom-out", label: "−", title: "Zoom -" },
+                  { action: "up", label: "↑", title: "Monter" },
+                  { action: "zoom-in", label: "+", title: "Zoom +" },
+                  { action: "left", label: "←", title: "Gauche" },
+                  { action: "reset", label: "R", title: "Réinitialiser" },
+                  { action: "right", label: "→", title: "Droite" },
+                  { action: "down", label: "↓", title: "Descendre" }
+                ].map((control) => (
+                  <button
+                    key={control.action}
+                    type="button"
+                    title={control.title}
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-slate-700 text-[11px] font-semibold leading-none text-white shadow-[0_2px_8px_rgba(0,0,0,0.25)] transition hover:bg-slate-500 ${
+                      control.action === "down" ? "col-start-2" : ""
+                    }`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onAdjustGuestVideoFraming?.(
+                        guest.participantId,
+                        control.action as GuestVideoFramingAction
+                      );
+                    }}
+                  >
+                    {control.label}
+                  </button>
+                ))}
+              </div>
 
               <div className="pointer-events-none absolute left-4 top-4 z-20 flex gap-2">
                 {guest.inProgram || isActiveInRegie ? (
@@ -2176,6 +2274,7 @@ export function ProgramOutputSurface({
   session,
   channel,
   programGuestIds,
+  guestVideoFraming,
   emptyClassName = "h-full w-full bg-black"
 }: ProgramOutputSurfaceProps) {
   return session ? (
@@ -2186,7 +2285,7 @@ export function ProgramOutputSurface({
       data-lk-theme="default"
       className="contents"
     >
-      <ProgramOutputContent programGuestIds={programGuestIds} />
+      <ProgramOutputContent programGuestIds={programGuestIds} guestVideoFraming={guestVideoFraming} />
     </LiveKitRoom>
   ) : (
     <div className={emptyClassName} />
@@ -2201,6 +2300,7 @@ export function ControlGuestGridSurface({
   onToggleProgramAudioMute,
   onToggleRegieAudioMute,
   onToggleGuestSlideControl,
+  onAdjustGuestVideoFraming,
   onSelectGuestReturnSource,
   onDisconnectGuest,
   onPresentGuestIdsChange,
@@ -2226,6 +2326,7 @@ export function ControlGuestGridSurface({
         onToggleProgramAudioMute={onToggleProgramAudioMute}
         onToggleRegieAudioMute={onToggleRegieAudioMute}
         onToggleGuestSlideControl={onToggleGuestSlideControl}
+        onAdjustGuestVideoFraming={onAdjustGuestVideoFraming}
         onSelectGuestReturnSource={onSelectGuestReturnSource}
         onDisconnectGuest={onDisconnectGuest}
         onPresentGuestIdsChange={onPresentGuestIdsChange}

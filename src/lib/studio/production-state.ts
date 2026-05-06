@@ -1,6 +1,7 @@
 import { normalizeRoomSlug } from "@/lib/livekit/topology";
 import type { StudioMessage } from "@/lib/types/messaging";
 import type {
+  GuestVideoFraming,
   ProductionParticipantState,
   ProductionSnapshot,
   ReturnSource,
@@ -10,6 +11,7 @@ import type { SurfaceRole } from "@/lib/types/roles";
 
 interface RoomState {
   programGuestIds: string[];
+  guestVideoFraming: Map<string, GuestVideoFraming>;
   globalReturnSource: ReturnSource;
   guestReturnOverrides: Map<string, ReturnSource>;
   participants: Map<string, ProductionParticipantState>;
@@ -40,6 +42,7 @@ function getRoomState(room: string): RoomState {
   if (!store.has(roomSlug)) {
     store.set(roomSlug, {
       programGuestIds: [],
+      guestVideoFraming: new Map<string, GuestVideoFraming>(),
       globalReturnSource: "STUDIO",
       guestReturnOverrides: new Map<string, ReturnSource>(),
       participants: new Map<string, ProductionParticipantState>(),
@@ -50,7 +53,10 @@ function getRoomState(room: string): RoomState {
     });
   }
 
-  return store.get(roomSlug)!;
+  const roomState = store.get(roomSlug)!;
+  roomState.guestVideoFraming ??= new Map<string, GuestVideoFraming>();
+
+  return roomState;
 }
 
 export function upsertParticipantState(
@@ -107,6 +113,7 @@ function pruneRoomState(roomState: RoomState) {
   );
   for (const participantId of staleParticipantIds) {
     roomState.guestReturnOverrides.delete(participantId);
+    roomState.guestVideoFraming.delete(participantId);
   }
 
   if (nextProgramGuestIds.length !== roomState.programGuestIds.length) {
@@ -124,6 +131,7 @@ export function getProductionSnapshot(room: string): ProductionSnapshot {
   return {
     room: roomSlug,
     programGuestIds: [...roomState.programGuestIds],
+    guestVideoFraming: Object.fromEntries(roomState.guestVideoFraming.entries()),
     globalReturnSource: roomState.globalReturnSource,
     guestReturnOverrides: Object.fromEntries(roomState.guestReturnOverrides.entries()),
     participants: Array.from(roomState.participants.values()).sort((left, right) => {
@@ -157,6 +165,30 @@ export function setProgramGuestIds(room: string, guestIds: string[]) {
   roomState.updatedAt = new Date().toISOString();
 
   return [...roomState.programGuestIds];
+}
+
+export function setGuestVideoFraming(input: {
+  room: string;
+  guestId: string;
+  framing: GuestVideoFraming;
+}) {
+  const roomState = getRoomState(input.room);
+  pruneRoomState(roomState);
+  const nextFraming: GuestVideoFraming = {
+    zoom: Math.max(1, Math.min(2, input.framing.zoom)),
+    x: Math.max(-50, Math.min(50, input.framing.x)),
+    y: Math.max(-50, Math.min(50, input.framing.y))
+  };
+
+  if (nextFraming.zoom === 1 && nextFraming.x === 0 && nextFraming.y === 0) {
+    roomState.guestVideoFraming.delete(input.guestId);
+  } else {
+    roomState.guestVideoFraming.set(input.guestId, nextFraming);
+  }
+
+  roomState.updatedAt = new Date().toISOString();
+
+  return Object.fromEntries(roomState.guestVideoFraming.entries());
 }
 
 export function setGlobalReturnSource(room: string, source: ReturnSource) {
@@ -204,6 +236,7 @@ export function removeParticipantState(room: string, participantId: string) {
 
   roomState.programGuestIds = roomState.programGuestIds.filter((guestId) => guestId !== participantId);
   roomState.guestReturnOverrides.delete(participantId);
+  roomState.guestVideoFraming.delete(participantId);
   roomState.updatedAt = new Date().toISOString();
 
   return true;

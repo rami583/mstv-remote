@@ -6,6 +6,7 @@ import { fetchLiveKitToken } from "@/lib/livekit/browser-token";
 import { buildParticipantIdentity } from "@/lib/livekit/identity";
 import { fetchProductionSnapshot } from "@/lib/studio/control-plane";
 import type { TokenResponsePayload } from "@/lib/types/livekit";
+import type { GuestVideoFraming } from "@/lib/types/runtime";
 
 interface ProgramRoomClientProps {
   room: string;
@@ -25,6 +26,9 @@ export function ProgramRoomClient({ room }: ProgramRoomClientProps) {
   );
   const [session, setSession] = useState<TokenResponsePayload | null>(null);
   const [programGuestIds, setProgramGuestIds] = useState<string[]>([]);
+  const [guestVideoFraming, setGuestVideoFraming] = useState<
+    Record<string, GuestVideoFraming | undefined>
+  >({});
 
   useEffect(() => {
     let active = true;
@@ -65,6 +69,7 @@ export function ProgramRoomClient({ room }: ProgramRoomClientProps) {
 
       const nextGuestIds = snapshot.programGuestIds.slice(0, 3);
       setProgramGuestIds(nextGuestIds);
+      setGuestVideoFraming(snapshot.guestVideoFraming ?? {});
     }
 
     const refreshSceneSafely = () => {
@@ -84,7 +89,12 @@ export function ProgramRoomClient({ room }: ProgramRoomClientProps) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-black">
       <div className="aspect-video h-auto w-screen max-h-screen bg-black">
-        <ProgramOutputSurface session={session} channel="contribution" programGuestIds={programGuestIds} />
+        <ProgramOutputSurface
+          session={session}
+          channel="contribution"
+          programGuestIds={programGuestIds}
+          guestVideoFraming={guestVideoFraming}
+        />
       </div>
     </main>
   );

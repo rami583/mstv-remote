@@ -89,9 +89,16 @@ export interface StudioControlCommand {
   status: "pending" | "acknowledged";
 }
 
+export interface GuestVideoFraming {
+  zoom: number;
+  x: number;
+  y: number;
+}
+
 export interface ProductionSnapshot {
   room: string;
   programGuestIds: string[];
+  guestVideoFraming: Record<string, GuestVideoFraming | undefined>;
   globalReturnSource: ReturnSource;
   guestReturnOverrides: Record<string, ReturnSource | undefined>;
   participants: ProductionParticipantState[];
