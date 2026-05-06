@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("mstvDesktop", {
   getProgramDisplays: () => ipcRenderer.invoke("mstv:get-program-displays"),
   toggleProgramWindow: (displayId, roomSlug) => ipcRenderer.invoke("mstv:toggle-program-window", displayId, roomSlug),
+  setSessionSlug: (roomSlug) => ipcRenderer.invoke("mstv:set-session-slug", roomSlug),
   writeClipboardText: (text) => ipcRenderer.invoke("mstv:write-clipboard-text", text),
   sendSlideCommand: (input) => ipcRenderer.invoke("mstv:send-slide-command", input),
   chooseProgramRecordingPath: (input) => ipcRenderer.invoke("mstv:choose-program-recording-path", input),

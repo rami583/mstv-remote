@@ -69,6 +69,11 @@ declare global {
         displayId?: number | string | null,
         roomSlug?: string
       ) => Promise<DesktopProgramWindowResponse>;
+      setSessionSlug?: (roomSlug: string) => Promise<{
+        ok: boolean;
+        roomSlug: string;
+        path?: string;
+      }>;
       writeClipboardText?: (text: string) => Promise<{ ok: boolean }>;
       showItemInFolder?: (filePath: string) => Promise<{ ok: boolean }>;
       chooseProgramRecordingPath?: (input: {
@@ -2073,12 +2078,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   async function handleApplySessionSlug() {
     const nextRoom = sanitizedSessionSlug;
 
-    if (nextRoom === room) {
-      setSessionSlugDraft(nextRoom);
-      return;
-    }
-
     if (
+      nextRoom !== room &&
       isProgramWindowOpen &&
       !window.confirm(
         "La sortie Program est ouverte. Elle va être fermée avant de changer de session."
@@ -2088,22 +2089,32 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     }
 
     try {
-      if (isProgramWindowOpen && window.mstvDesktop) {
+      if (nextRoom !== room && isProgramWindowOpen && window.mstvDesktop) {
         const response = await window.mstvDesktop.toggleProgramWindow(selectedProgramDisplayId, room);
 
         setProgramDisplays(response.displays);
         setIsProgramWindowOpen(response.programWindow.isOpen);
       }
+
+      if (window.mstvDesktop?.setSessionSlug) {
+        await window.mstvDesktop.setSessionSlug(nextRoom);
+      } else {
+        window.localStorage.setItem("mstv.sessionSlug", nextRoom);
+      }
     } catch (programWindowError) {
       setError(
         programWindowError instanceof Error
           ? programWindowError.message
-          : "Impossible de fermer la sortie Program."
+          : "Impossible d’appliquer cette session."
       );
       return;
     }
 
-    window.location.assign(`/control/${encodeURIComponent(nextRoom)}`);
+    setSessionSlugDraft(nextRoom);
+
+    if (nextRoom !== room) {
+      window.location.assign(`/control/${encodeURIComponent(nextRoom)}`);
+    }
   }
 
   async function handleToggleProgramWindow() {
