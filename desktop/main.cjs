@@ -1021,6 +1021,17 @@ function configureDesktopIpc() {
     return { ok: true };
   });
 
+  ipcMain.handle("mstv:show-item-in-folder", (_event, filePath) => {
+    const normalizedPath = String(filePath || "");
+
+    if (!normalizedPath) {
+      throw new Error("Aucun fichier à afficher.");
+    }
+
+    shell.showItemInFolder(normalizedPath);
+    return { ok: true };
+  });
+
   ipcMain.handle("mstv:save-program-recording", async (_event, input) => {
     const bytes = input?.bytes;
     const requestedFileName = String(input?.fileName || "");
@@ -1035,17 +1046,29 @@ function configureDesktopIpc() {
     const outputDir = path.join(app.getPath("movies"), PROGRAM_RECORDING_DIR_NAME);
     const outputPath = path.join(outputDir, safeFileName);
 
+    log("Program recording save requested", {
+      outputDir,
+      outputPath,
+      byteLength: bytes.byteLength,
+      ffmpegExitCode: null
+    });
+
     await fs.promises.mkdir(outputDir, { recursive: true });
     await fs.promises.writeFile(outputPath, Buffer.from(bytes));
+    const stat = await fs.promises.stat(outputPath);
+    const fileExists = stat.isFile();
 
     log("Program recording saved", {
       outputPath,
-      byteLength: bytes.byteLength
+      fileExists,
+      fileSizeBytes: stat.size,
+      ffmpegExitCode: null
     });
 
     return {
       ok: true,
-      filePath: outputPath
+      filePath: outputPath,
+      fileSizeBytes: stat.size
     };
   });
 

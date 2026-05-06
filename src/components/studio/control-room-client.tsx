@@ -66,10 +66,11 @@ declare global {
         roomSlug?: string
       ) => Promise<DesktopProgramWindowResponse>;
       writeClipboardText?: (text: string) => Promise<{ ok: boolean }>;
+      showItemInFolder?: (filePath: string) => Promise<{ ok: boolean }>;
       saveProgramRecording?: (input: {
         bytes: ArrayBuffer;
         fileName: string;
-      }) => Promise<{ ok: boolean; filePath: string }>;
+      }) => Promise<{ ok: boolean; filePath: string; fileSizeBytes?: number }>;
       sendSlideCommand: (input: {
         host: string;
         port: string;
@@ -601,6 +602,22 @@ function formatRecordingDuration(elapsedMs: number) {
   const seconds = totalSeconds % 60;
 
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatFileSize(bytes?: number | null) {
+  if (!bytes || bytes <= 0) {
+    return null;
+  }
+
+  if (bytes >= 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} Go`;
+  }
+
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  }
+
+  return `${Math.round(bytes / 1024)} Ko`;
 }
 
 const topPanelClassName =
@@ -1632,6 +1649,20 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     });
   }
 
+  function handleShowRecordingInFinder() {
+    if (!programRecordingStatus.filePath || !window.mstvDesktop?.showItemInFolder) {
+      return;
+    }
+
+    void window.mstvDesktop.showItemInFolder(programRecordingStatus.filePath).catch((finderError) => {
+      setError(
+        finderError instanceof Error
+          ? finderError.message
+          : "Impossible d’afficher l’enregistrement dans le Finder."
+      );
+    });
+  }
+
   function handleToggleProgramAudioMute(participantId: string) {
     if (!programGuestIds.includes(participantId)) {
       return;
@@ -2018,6 +2049,40 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           </div>
         ) : null}
 
+        {programRecordingStatus.filePath && programRecordingStatus.state === "idle" ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            <span className="mstv-ui-badge border-transparent bg-emerald-500 text-white">
+              Enregistrement terminé
+            </span>
+            <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-100">
+              {programRecordingStatus.filePath}
+            </span>
+            {formatFileSize(programRecordingStatus.fileSizeBytes) ? (
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-200">
+                {formatFileSize(programRecordingStatus.fileSizeBytes)}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleShowRecordingInFinder}
+              className="mstv-ui-button border border-white/10 bg-white/10 text-white transition hover:bg-white/15"
+            >
+              Afficher dans le Finder
+            </button>
+          </div>
+        ) : null}
+
+        {programRecordingStatus.state === "error" && programRecordingStatus.error ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-tally/30 bg-tally/10 px-4 py-3 text-sm text-white">
+            <span className="mstv-ui-badge border-transparent bg-[#d4301f] text-white">
+              Échec de l’enregistrement
+            </span>
+            <span className="min-w-0 flex-1 text-sm text-slate-100">
+              {programRecordingStatus.error}
+            </span>
+          </div>
+        ) : null}
+
         {desktopConfig ? (
           <div className={`flex flex-wrap items-center gap-3 ${topPanelClassName}`}>
             <span className="mstv-ui-label">
@@ -2333,9 +2398,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           recordingCommand={programRecordingCommand}
           onRecordingStatusChange={(status) => {
             setProgramRecordingStatus(status);
-            if (status.state === "error" && status.error) {
-              setError(status.error);
-            }
           }}
           programAudioOutputDeviceId={programAudioOutputDeviceId}
           regieMonitorOutputDeviceId=""

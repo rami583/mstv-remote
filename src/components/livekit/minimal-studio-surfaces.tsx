@@ -117,6 +117,7 @@ export interface ProgramRecordingStatus {
   state: "idle" | "starting" | "recording" | "stopping" | "saving" | "error";
   startedAt: number | null;
   filePath?: string | null;
+  fileSizeBytes?: number | null;
   error?: string | null;
 }
 
@@ -1113,7 +1114,7 @@ function ProgramRecordingBridge({
         saveProgramRecording?: (input: {
           bytes: ArrayBuffer;
           fileName: string;
-        }) => Promise<{ ok: boolean; filePath: string }>;
+        }) => Promise<{ ok: boolean; filePath: string; fileSizeBytes?: number }>;
       };
     }).mstvDesktop;
 
@@ -1148,6 +1149,14 @@ function ProgramRecordingBridge({
     }
 
     setStatus({ state: "starting", startedAt: null, error: null, filePath: null });
+    console.info("[MSTV Recording] recording started", {
+      width: PROGRAM_RECORDING_WIDTH,
+      height: PROGRAM_RECORDING_HEIGHT,
+      fps: PROGRAM_RECORDING_FPS,
+      videoBitrate: PROGRAM_RECORDING_VIDEO_BITRATE,
+      audioBitrate: PROGRAM_RECORDING_AUDIO_BITRATE,
+      mimeType
+    });
     chunksRef.current = [];
     canvas.width = PROGRAM_RECORDING_WIDTH;
     canvas.height = PROGRAM_RECORDING_HEIGHT;
@@ -1189,6 +1198,10 @@ function ProgramRecordingBridge({
       const chunks = chunksRef.current;
       const fileName = formatProgramRecordingFileName(new Date());
 
+      console.info("[MSTV Recording] recording stopped", {
+        chunks: chunks.length,
+        fileName
+      });
       setStatus({ ...statusRef.current, state: "saving" });
       cleanupRecording();
 
@@ -1196,10 +1209,16 @@ function ProgramRecordingBridge({
         .arrayBuffer()
         .then((bytes) => desktopApi.saveProgramRecording!({ bytes, fileName }))
         .then((result) => {
+          console.info("[MSTV Recording] recording saved", {
+            outputPath: result.filePath,
+            fileSizeBytes: result.fileSizeBytes ?? null,
+            ffmpegExitCode: null
+          });
           setStatus({
             state: "idle",
             startedAt: null,
             filePath: result.filePath,
+            fileSizeBytes: result.fileSizeBytes ?? null,
             error: null
           });
         })

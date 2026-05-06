@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld("mstvDesktop", {
   toggleProgramWindow: (displayId, roomSlug) => ipcRenderer.invoke("mstv:toggle-program-window", displayId, roomSlug),
   writeClipboardText: (text) => ipcRenderer.invoke("mstv:write-clipboard-text", text),
   sendSlideCommand: (input) => ipcRenderer.invoke("mstv:send-slide-command", input),
-  saveProgramRecording: (input) => ipcRenderer.invoke("mstv:save-program-recording", input)
+  saveProgramRecording: (input) => ipcRenderer.invoke("mstv:save-program-recording", input),
+  showItemInFolder: (filePath) => ipcRenderer.invoke("mstv:show-item-in-folder", filePath)
 });
