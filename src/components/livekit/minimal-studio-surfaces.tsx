@@ -921,6 +921,7 @@ function ProgramRecordingBridge({
   const audioNodesRef = useRef<Array<MediaStreamAudioSourceNode>>([]);
   const statusRef = useRef<ProgramRecordingStatus>({ state: "idle", startedAt: null });
   const handledCommandIdRef = useRef<number | null>(null);
+  const outputPathRef = useRef<string | null>(null);
 
   useEffect(() => {
     latestGuestsRef.current = guests;
@@ -1111,9 +1112,12 @@ function ProgramRecordingBridge({
     const canvas = canvasRef.current;
     const desktopApi = (window as Window & {
       mstvDesktop?: {
+        chooseProgramRecordingPath?: (input: {
+          defaultFileName: string;
+        }) => Promise<{ canceled: boolean; filePath: string | null }>;
         saveProgramRecording?: (input: {
           bytes: ArrayBuffer;
-          fileName: string;
+          filePath: string;
         }) => Promise<{ ok: boolean; filePath: string; fileSizeBytes?: number }>;
       };
     }).mstvDesktop;
@@ -1127,7 +1131,7 @@ function ProgramRecordingBridge({
       return;
     }
 
-    if (!desktopApi?.saveProgramRecording) {
+    if (!desktopApi?.chooseProgramRecordingPath || !desktopApi.saveProgramRecording) {
       setStatus({
         state: "error",
         startedAt: null,
@@ -1148,8 +1152,19 @@ function ProgramRecordingBridge({
       return;
     }
 
+    const defaultFileName = formatProgramRecordingFileName(new Date());
+    const selectedPath = await desktopApi.chooseProgramRecordingPath({ defaultFileName });
+
+    if (selectedPath.canceled || !selectedPath.filePath) {
+      outputPathRef.current = null;
+      setStatus({ state: "idle", startedAt: null, error: null, filePath: null });
+      return;
+    }
+
+    outputPathRef.current = selectedPath.filePath;
     setStatus({ state: "starting", startedAt: null, error: null, filePath: null });
     console.info("[MSTV Recording] recording started", {
+      outputPath: selectedPath.filePath,
       width: PROGRAM_RECORDING_WIDTH,
       height: PROGRAM_RECORDING_HEIGHT,
       fps: PROGRAM_RECORDING_FPS,
@@ -1196,18 +1211,27 @@ function ProgramRecordingBridge({
     };
     recorder.onstop = () => {
       const chunks = chunksRef.current;
-      const fileName = formatProgramRecordingFileName(new Date());
+      const outputPath = outputPathRef.current;
 
       console.info("[MSTV Recording] recording stopped", {
         chunks: chunks.length,
-        fileName
+        outputPath
       });
       setStatus({ ...statusRef.current, state: "saving" });
       cleanupRecording();
 
+      if (!outputPath) {
+        setStatus({
+          state: "error",
+          startedAt: null,
+          error: "Aucun chemin d’enregistrement sélectionné."
+        });
+        return;
+      }
+
       void new Blob(chunks, { type: mimeType })
         .arrayBuffer()
-        .then((bytes) => desktopApi.saveProgramRecording!({ bytes, fileName }))
+        .then((bytes) => desktopApi.saveProgramRecording!({ bytes, filePath: outputPath }))
         .then((result) => {
           console.info("[MSTV Recording] recording saved", {
             outputPath: result.filePath,

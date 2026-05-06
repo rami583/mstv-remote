@@ -23,7 +23,6 @@ const CONTROL_WINDOW_WIDTH = CONTROL_TILE_WIDTH * 3 + CONTROL_TILE_GAP * 2 + CON
 const CONTROL_WINDOW_HEIGHT = 1080;
 const CONTROL_WINDOW_MIN_HEIGHT = 960;
 const SLIDE_RECEIVER_TIMEOUT_MS = 10_000;
-const PROGRAM_RECORDING_DIR_NAME = "MSTV Visio";
 
 let nextServerProcess = null;
 let controlWindow = null;
@@ -1032,19 +1031,58 @@ function configureDesktopIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle("mstv:save-program-recording", async (_event, input) => {
-    const bytes = input?.bytes;
-    const requestedFileName = String(input?.fileName || "");
+  ipcMain.handle("mstv:choose-program-recording-path", async (_event, input) => {
+    const requestedFileName = String(input?.defaultFileName || "");
     const safeFileName = /^MSTV-Program-\d{4}-\d{2}-\d{2}-\d{6}\.mp4$/.test(requestedFileName)
       ? requestedFileName
       : `MSTV-Program-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}.mp4`;
+    const result = await dialog.showSaveDialog(controlWindow ?? undefined, {
+      title: "Enregistrer le programme",
+      defaultPath: safeFileName,
+      filters: [
+        {
+          name: "Fichier MP4",
+          extensions: ["mp4"]
+        }
+      ],
+      properties: ["createDirectory", "showOverwriteConfirmation"]
+    });
+
+    log("Program recording save dialog completed", {
+      canceled: result.canceled,
+      filePath: result.filePath ?? null
+    });
+
+    if (result.canceled || !result.filePath) {
+      return {
+        canceled: true,
+        filePath: null
+      };
+    }
+
+    const filePath = result.filePath.toLowerCase().endsWith(".mp4")
+      ? result.filePath
+      : `${result.filePath}.mp4`;
+
+    return {
+      canceled: false,
+      filePath
+    };
+  });
+
+  ipcMain.handle("mstv:save-program-recording", async (_event, input) => {
+    const bytes = input?.bytes;
+    const outputPath = String(input?.filePath || "");
 
     if (!(bytes instanceof ArrayBuffer) || bytes.byteLength === 0) {
       throw new Error("Recording data is empty.");
     }
 
-    const outputDir = path.join(app.getPath("movies"), PROGRAM_RECORDING_DIR_NAME);
-    const outputPath = path.join(outputDir, safeFileName);
+    if (!outputPath) {
+      throw new Error("Aucun chemin d’enregistrement sélectionné.");
+    }
+
+    const outputDir = path.dirname(outputPath);
 
     log("Program recording save requested", {
       outputDir,

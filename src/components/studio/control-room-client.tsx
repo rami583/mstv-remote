@@ -67,9 +67,12 @@ declare global {
       ) => Promise<DesktopProgramWindowResponse>;
       writeClipboardText?: (text: string) => Promise<{ ok: boolean }>;
       showItemInFolder?: (filePath: string) => Promise<{ ok: boolean }>;
+      chooseProgramRecordingPath?: (input: {
+        defaultFileName: string;
+      }) => Promise<{ canceled: boolean; filePath: string | null }>;
       saveProgramRecording?: (input: {
         bytes: ArrayBuffer;
-        fileName: string;
+        filePath: string;
       }) => Promise<{ ok: boolean; filePath: string; fileSizeBytes?: number }>;
       sendSlideCommand: (input: {
         host: string;
