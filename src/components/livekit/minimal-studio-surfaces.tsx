@@ -108,8 +108,19 @@ const defaultGuestVideoFraming: GuestVideoFraming = {
   y: 0
 };
 
+function clampGuestVideoFraming(framing: GuestVideoFraming): GuestVideoFraming {
+  const zoom = Math.max(1, Math.min(2, Number(framing.zoom.toFixed(2))));
+  const maxOffset = Number(((zoom - 1) * 50).toFixed(1));
+
+  return {
+    zoom,
+    x: Math.max(-maxOffset, Math.min(maxOffset, Number(framing.x.toFixed(1)))),
+    y: Math.max(-maxOffset, Math.min(maxOffset, Number(framing.y.toFixed(1))))
+  };
+}
+
 function getVideoFramingTransform(framing?: GuestVideoFraming) {
-  const nextFraming = framing ?? defaultGuestVideoFraming;
+  const nextFraming = clampGuestVideoFraming(framing ?? defaultGuestVideoFraming);
 
   return {
     transform: `translate(${nextFraming.x}%, ${nextFraming.y}%) scale(${nextFraming.zoom})`,
@@ -2270,7 +2281,7 @@ function ControlGuestGridContent({
                     key={control.action}
                     type="button"
                     title={control.title}
-                    className={`flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-slate-700 text-[11px] font-semibold leading-none text-white shadow-[0_2px_8px_rgba(0,0,0,0.25)] transition hover:bg-slate-500 ${
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border border-transparent bg-slate-600 text-[11px] font-bold leading-none text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition hover:bg-slate-500 ${
                       control.action === "down" ? "col-start-2" : ""
                     }`}
                     onClick={(event) => {

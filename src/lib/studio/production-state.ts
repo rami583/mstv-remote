@@ -22,6 +22,8 @@ interface RoomState {
 }
 
 const PARTICIPANT_STALE_AFTER_MS = 45_000;
+const MIN_GUEST_VIDEO_ZOOM = 1;
+const MAX_GUEST_VIDEO_ZOOM = 2;
 
 declare global {
   var __visioProductionStore: Map<string, RoomState> | undefined;
@@ -123,6 +125,20 @@ function pruneRoomState(roomState: RoomState) {
   roomState.updatedAt = new Date().toISOString();
 }
 
+function clampGuestVideoFraming(framing: GuestVideoFraming): GuestVideoFraming {
+  const zoom = Math.max(
+    MIN_GUEST_VIDEO_ZOOM,
+    Math.min(MAX_GUEST_VIDEO_ZOOM, Number(framing.zoom.toFixed(2)))
+  );
+  const maxOffset = Number(((zoom - 1) * 50).toFixed(1));
+
+  return {
+    zoom,
+    x: Math.max(-maxOffset, Math.min(maxOffset, Number(framing.x.toFixed(1)))),
+    y: Math.max(-maxOffset, Math.min(maxOffset, Number(framing.y.toFixed(1))))
+  };
+}
+
 export function getProductionSnapshot(room: string): ProductionSnapshot {
   const roomSlug = normalizeRoomSlug(room);
   const roomState = getRoomState(roomSlug);
@@ -174,11 +190,7 @@ export function setGuestVideoFraming(input: {
 }) {
   const roomState = getRoomState(input.room);
   pruneRoomState(roomState);
-  const nextFraming: GuestVideoFraming = {
-    zoom: Math.max(1, Math.min(2, input.framing.zoom)),
-    x: Math.max(-50, Math.min(50, input.framing.x)),
-    y: Math.max(-50, Math.min(50, input.framing.y))
-  };
+  const nextFraming = clampGuestVideoFraming(input.framing);
 
   if (nextFraming.zoom === 1 && nextFraming.x === 0 && nextFraming.y === 0) {
     roomState.guestVideoFraming.delete(input.guestId);

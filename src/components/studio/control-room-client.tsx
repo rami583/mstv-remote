@@ -587,10 +587,13 @@ const defaultGuestVideoFraming: GuestVideoFraming = {
 };
 
 function clampGuestVideoFraming(framing: GuestVideoFraming): GuestVideoFraming {
+  const zoom = Math.max(1, Math.min(2, Number(framing.zoom.toFixed(2))));
+  const maxOffset = Number(((zoom - 1) * 50).toFixed(1));
+
   return {
-    zoom: Math.max(1, Math.min(2, Number(framing.zoom.toFixed(2)))),
-    x: Math.max(-50, Math.min(50, Number(framing.x.toFixed(1)))),
-    y: Math.max(-50, Math.min(50, Number(framing.y.toFixed(1))))
+    zoom,
+    x: Math.max(-maxOffset, Math.min(maxOffset, Number(framing.x.toFixed(1)))),
+    y: Math.max(-maxOffset, Math.min(maxOffset, Number(framing.y.toFixed(1))))
   };
 }
 
