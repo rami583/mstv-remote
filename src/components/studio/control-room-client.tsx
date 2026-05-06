@@ -5,6 +5,8 @@ import {
   ControlGuestGridSurface,
   ControlProgramRoutingBridge,
   ControlReturnFeedPublisher,
+  type ProgramRecordingCommand,
+  type ProgramRecordingStatus,
   type ReturnFeedPublisherDebugState,
   type ReturnFeedPublisherState
 } from "@/components/livekit/minimal-studio-surfaces";
@@ -64,6 +66,10 @@ declare global {
         roomSlug?: string
       ) => Promise<DesktopProgramWindowResponse>;
       writeClipboardText?: (text: string) => Promise<{ ok: boolean }>;
+      saveProgramRecording?: (input: {
+        bytes: ArrayBuffer;
+        fileName: string;
+      }) => Promise<{ ok: boolean; filePath: string }>;
       sendSlideCommand: (input: {
         host: string;
         port: string;
@@ -589,10 +595,24 @@ const [firstSource] = effectiveSources;
   return effectiveSources.every((source) => source === firstSource) ? firstSource : null;
 }
 
+function formatRecordingDuration(elapsedMs: number) {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 const topPanelClassName =
   "rounded-[18px] border border-white/[0.08] bg-black/60 px-4 py-3 text-sm text-slate-300 backdrop-blur-md";
 const defaultSlideReceiverHost = "slides.local";
 const defaultSlideReceiverPort = "4317";
+const programRecordingActiveStates = new Set<ProgramRecordingStatus["state"]>([
+  "starting",
+  "recording",
+  "stopping",
+  "saving"
+]);
 
 function buildParticipantStateFromLiveKit(
   participant: RuntimeParticipantState,
@@ -773,6 +793,13 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     message: "Receiver non configuré"
   });
   const [lastSlideCommandFeedback, setLastSlideCommandFeedback] = useState<SlideCommandFeedback | null>(null);
+  const [programRecordingCommand, setProgramRecordingCommand] =
+    useState<ProgramRecordingCommand | null>(null);
+  const [programRecordingStatus, setProgramRecordingStatus] = useState<ProgramRecordingStatus>({
+    state: "idle",
+    startedAt: null
+  });
+  const [programRecordingElapsedMs, setProgramRecordingElapsedMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const refreshMediaDevices = useCallback(async (requestPermissions: boolean) => {
@@ -1049,6 +1076,24 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
     window.localStorage.setItem("mstv.slideReceiverPort", slideReceiverPort);
   }, [slideReceiverPort, slideReceiverSettingsLoaded]);
+
+  useEffect(() => {
+    if (!programRecordingStatus.startedAt || programRecordingStatus.state !== "recording") {
+      setProgramRecordingElapsedMs(0);
+      return;
+    }
+
+    const updateElapsed = () => {
+      setProgramRecordingElapsedMs(Date.now() - programRecordingStatus.startedAt!);
+    };
+
+    updateElapsed();
+    const interval = window.setInterval(updateElapsed, 500);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [programRecordingStatus.startedAt, programRecordingStatus.state]);
 
   useEffect(() => {
     window.localStorage.setItem("mstv.programAudioOutputDeviceId", programAudioOutputDeviceId);
@@ -1578,6 +1623,15 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     }
   }
 
+  function handleToggleProgramRecording() {
+    const isRecordingActive = programRecordingActiveStates.has(programRecordingStatus.state);
+
+    setProgramRecordingCommand({
+      action: isRecordingActive ? "stop" : "start",
+      requestId: Date.now()
+    });
+  }
+
   function handleToggleProgramAudioMute(participantId: string) {
     if (!programGuestIds.includes(participantId)) {
       return;
@@ -2054,6 +2108,24 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             <div className="ml-auto flex items-center gap-3">
               <button
                 type="button"
+                onClick={handleToggleProgramRecording}
+                className={`mstv-ui-button inline-flex items-center gap-2 border transition ${
+                  programRecordingActiveStates.has(programRecordingStatus.state)
+                    ? "border-transparent bg-[#d4301f] text-white hover:bg-[#e13a28]"
+                    : "border-white/10 bg-white/10 text-slate-300 hover:border-white/20 hover:text-white"
+                }`}
+              >
+                {programRecordingStatus.state === "recording" ? (
+                  <span className="h-2 w-2 rounded-full bg-white" />
+                ) : null}
+                <span>
+                  {programRecordingActiveStates.has(programRecordingStatus.state)
+                    ? `Stop ${formatRecordingDuration(programRecordingElapsedMs)}`
+                    : "Rec"}
+                </span>
+              </button>
+              <button
+                type="button"
                 aria-pressed={pipModeEnabled}
                 onClick={() => {
                   void handleTogglePipMode();
@@ -2258,6 +2330,13 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           onDisconnectGuest={handleDisconnectGuest}
           onPresentGuestIdsChange={handlePresentGuestIdsChange}
           onLiveGuestStatesChange={handleLiveGuestStatesChange}
+          recordingCommand={programRecordingCommand}
+          onRecordingStatusChange={(status) => {
+            setProgramRecordingStatus(status);
+            if (status.state === "error" && status.error) {
+              setError(status.error);
+            }
+          }}
           programAudioOutputDeviceId={programAudioOutputDeviceId}
           regieMonitorOutputDeviceId=""
           gridClassName={controlTileGridClassName}

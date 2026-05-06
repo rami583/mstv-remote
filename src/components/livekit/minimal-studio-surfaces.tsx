@@ -84,6 +84,8 @@ interface ControlGuestGridSurfaceProps extends BaseSessionProps {
   onDisconnectGuest?: (participantId: string) => void;
   onPresentGuestIdsChange?: (participantIds: string[]) => void;
   onLiveGuestStatesChange?: (participants: RuntimeParticipantState[]) => void;
+  recordingCommand?: ProgramRecordingCommand | null;
+  onRecordingStatusChange?: (status: ProgramRecordingStatus) => void;
   programAudioOutputDeviceId?: string | null;
   regieMonitorOutputDeviceId?: string | null;
   gridClassName?: string;
@@ -104,6 +106,18 @@ export interface ReturnFeedPublisherDebugState {
   videoTrackCreated: boolean;
   videoTrackReadyState: string | null;
   previewStreamHasVideo: boolean;
+}
+
+export interface ProgramRecordingCommand {
+  action: "start" | "stop";
+  requestId: number;
+}
+
+export interface ProgramRecordingStatus {
+  state: "idle" | "starting" | "recording" | "stopping" | "saving" | "error";
+  startedAt: number | null;
+  filePath?: string | null;
+  error?: string | null;
 }
 
 interface ProgramReturnRoutingPayload {
@@ -798,6 +812,441 @@ function RoutedAudioTrack({
   return <audio ref={audioRef} autoPlay playsInline />;
 }
 
+const PROGRAM_RECORDING_WIDTH = 1920;
+const PROGRAM_RECORDING_HEIGHT = 1080;
+const PROGRAM_RECORDING_FPS = 25;
+const PROGRAM_RECORDING_VIDEO_BITRATE = 5_000_000;
+const PROGRAM_RECORDING_AUDIO_BITRATE = 160_000;
+
+function formatProgramRecordingFileName(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return [
+    "MSTV-Program-",
+    date.getFullYear(),
+    "-",
+    pad(date.getMonth() + 1),
+    "-",
+    pad(date.getDate()),
+    "-",
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+    ".mp4"
+  ].join("");
+}
+
+function getProgramRecordingMimeType() {
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) {
+    return null;
+  }
+
+  return (
+    [
+      'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+      "video/mp4"
+    ].find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? null
+  );
+}
+
+function drawVideoCover(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) {
+  const sourceWidth = video.videoWidth;
+  const sourceHeight = video.videoHeight;
+
+  if (!sourceWidth || !sourceHeight) {
+    context.fillStyle = "#000000";
+    context.fillRect(x, y, width, height);
+    return;
+  }
+
+  const sourceRatio = sourceWidth / sourceHeight;
+  const targetRatio = width / height;
+  let cropWidth = sourceWidth;
+  let cropHeight = sourceHeight;
+  let cropX = 0;
+  let cropY = 0;
+
+  if (sourceRatio > targetRatio) {
+    cropWidth = sourceHeight * targetRatio;
+    cropX = (sourceWidth - cropWidth) / 2;
+  } else {
+    cropHeight = sourceWidth / targetRatio;
+    cropY = (sourceHeight - cropHeight) / 2;
+  }
+
+  context.drawImage(video, cropX, cropY, cropWidth, cropHeight, x, y, width, height);
+}
+
+function getMediaStreamTrack(trackRef: TrackReference) {
+  const track = trackRef.publication.track as
+    | (NonNullable<TrackReference["publication"]["track"]> & { mediaStreamTrack?: MediaStreamTrack })
+    | undefined;
+
+  return track?.mediaStreamTrack ?? null;
+}
+
+function ProgramRecordingBridge({
+  guests,
+  participantTrackMap,
+  participantAudioTrackMap,
+  recordingCommand,
+  onRecordingStatusChange
+}: {
+  guests: ControlGuestGridSurfaceProps["guests"];
+  participantTrackMap: Map<string, TrackReference>;
+  participantAudioTrackMap: Map<string, TrackReference>;
+  recordingCommand?: ProgramRecordingCommand | null;
+  onRecordingStatusChange?: (status: ProgramRecordingStatus) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const latestGuestsRef = useRef(guests);
+  const latestVideoTracksRef = useRef(participantTrackMap);
+  const latestAudioTracksRef = useRef(participantAudioTrackMap);
+  const videoElementsRef = useRef(new Map<string, HTMLVideoElement>());
+  const videoTrackSidsRef = useRef(new Map<string, string>());
+  const drawIntervalRef = useRef<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const audioNodesRef = useRef<Array<MediaStreamAudioSourceNode>>([]);
+  const statusRef = useRef<ProgramRecordingStatus>({ state: "idle", startedAt: null });
+  const handledCommandIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    latestGuestsRef.current = guests;
+    latestVideoTracksRef.current = participantTrackMap;
+    latestAudioTracksRef.current = participantAudioTrackMap;
+  }, [guests, participantAudioTrackMap, participantTrackMap]);
+
+  const setStatus = (status: ProgramRecordingStatus) => {
+    statusRef.current = status;
+    onRecordingStatusChange?.(status);
+  };
+
+  const cleanupVideoElements = () => {
+    for (const [participantId, video] of videoElementsRef.current.entries()) {
+      const trackRef = latestVideoTracksRef.current.get(participantId);
+      trackRef?.publication.track?.detach(video);
+      video.srcObject = null;
+    }
+
+    videoElementsRef.current.clear();
+    videoTrackSidsRef.current.clear();
+  };
+
+  const syncVideoElements = () => {
+    const selectedGuests = latestGuestsRef.current.filter((guest) => guest.inProgram).slice(0, 3);
+    const selectedIds = new Set(selectedGuests.map((guest) => guest.participantId));
+
+    for (const [participantId, video] of videoElementsRef.current.entries()) {
+      if (selectedIds.has(participantId)) {
+        continue;
+      }
+
+      latestVideoTracksRef.current.get(participantId)?.publication.track?.detach(video);
+      video.srcObject = null;
+      videoElementsRef.current.delete(participantId);
+      videoTrackSidsRef.current.delete(participantId);
+    }
+
+    for (const guest of selectedGuests) {
+      const trackRef = latestVideoTracksRef.current.get(guest.participantId);
+      const track = trackRef?.publication.track;
+      const trackSid = trackRef?.publication.trackSid ?? "";
+
+      if (!track || !trackRef) {
+        continue;
+      }
+
+      const existingTrackSid = videoTrackSidsRef.current.get(guest.participantId);
+      const existingVideo = videoElementsRef.current.get(guest.participantId);
+
+      if (existingVideo && existingTrackSid === trackSid) {
+        continue;
+      }
+
+      if (existingVideo) {
+        track.detach(existingVideo);
+        existingVideo.srcObject = null;
+      }
+
+      const video = document.createElement("video");
+      video.muted = true;
+      video.playsInline = true;
+      video.autoplay = true;
+      track.attach(video);
+      void video.play().catch(() => undefined);
+      videoElementsRef.current.set(guest.participantId, video);
+      videoTrackSidsRef.current.set(guest.participantId, trackSid);
+    }
+  };
+
+  const drawFrame = () => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+
+    if (!canvas || !context) {
+      return;
+    }
+
+    syncVideoElements();
+
+    const selectedGuests = latestGuestsRef.current.filter((guest) => guest.inProgram).slice(0, 3);
+    context.fillStyle = "#000000";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (selectedGuests.length === 0) {
+      return;
+    }
+
+    const slotWidth = canvas.width / selectedGuests.length;
+
+    selectedGuests.forEach((guest, index) => {
+      const x = Math.round(index * slotWidth);
+      const nextX = Math.round((index + 1) * slotWidth);
+      const width = nextX - x;
+      const video = videoElementsRef.current.get(guest.participantId);
+
+      if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        drawVideoCover(context, video, x, 0, width, canvas.height);
+      } else {
+        context.fillStyle = "#000000";
+        context.fillRect(x, 0, width, canvas.height);
+      }
+    });
+
+    if (selectedGuests.length > 1) {
+      context.fillStyle = "#ffffff";
+
+      for (let index = 1; index < selectedGuests.length; index += 1) {
+        const x = Math.round(index * slotWidth - 2.5);
+        context.fillRect(x, 0, 5, canvas.height);
+      }
+    }
+  };
+
+  const cleanupAudioGraph = () => {
+    for (const node of audioNodesRef.current) {
+      node.disconnect();
+    }
+
+    audioNodesRef.current = [];
+  };
+
+  const syncAudioGraph = () => {
+    const audioContext = audioContextRef.current;
+    const destination = audioDestinationRef.current;
+
+    if (!audioContext || !destination) {
+      return;
+    }
+
+    cleanupAudioGraph();
+
+    const activeProgramGuests = latestGuestsRef.current.filter(
+      (guest) => guest.inProgram && !guest.programAudioMuted
+    );
+
+    for (const guest of activeProgramGuests) {
+      const trackRef = latestAudioTracksRef.current.get(guest.participantId);
+
+      if (!trackRef) {
+        continue;
+      }
+
+      const mediaStreamTrack = getMediaStreamTrack(trackRef);
+
+      if (!mediaStreamTrack) {
+        continue;
+      }
+
+      const source = audioContext.createMediaStreamSource(new MediaStream([mediaStreamTrack]));
+      source.connect(destination);
+      audioNodesRef.current.push(source);
+    }
+  };
+
+  useEffect(() => {
+    if (statusRef.current.state === "recording") {
+      syncAudioGraph();
+    }
+  });
+
+  const cleanupRecording = () => {
+    if (drawIntervalRef.current !== null) {
+      window.clearInterval(drawIntervalRef.current);
+      drawIntervalRef.current = null;
+    }
+
+    cleanupVideoElements();
+    cleanupAudioGraph();
+    void audioContextRef.current?.close().catch(() => undefined);
+    audioContextRef.current = null;
+    audioDestinationRef.current = null;
+    mediaRecorderRef.current = null;
+  };
+
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder || recorder.state === "inactive") {
+      return;
+    }
+
+    setStatus({ ...statusRef.current, state: "stopping" });
+    recorder.stop();
+  };
+
+  const startRecording = async () => {
+    const canvas = canvasRef.current;
+    const desktopApi = (window as Window & {
+      mstvDesktop?: {
+        saveProgramRecording?: (input: {
+          bytes: ArrayBuffer;
+          fileName: string;
+        }) => Promise<{ ok: boolean; filePath: string }>;
+      };
+    }).mstvDesktop;
+
+    if (!canvas || typeof canvas.captureStream !== "function") {
+      setStatus({
+        state: "error",
+        startedAt: null,
+        error: "Le compositor Program interne n’est pas disponible."
+      });
+      return;
+    }
+
+    if (!desktopApi?.saveProgramRecording) {
+      setStatus({
+        state: "error",
+        startedAt: null,
+        error: "L’enregistrement local est disponible uniquement dans MSTV Visio desktop."
+      });
+      return;
+    }
+
+    const mimeType = getProgramRecordingMimeType();
+
+    if (!mimeType) {
+      setStatus({
+        state: "error",
+        startedAt: null,
+        error:
+          "Encodeur MP4 H.264/AAC indisponible dans ce runtime. Il faudra embarquer FFmpeg pour garantir le MP4."
+      });
+      return;
+    }
+
+    setStatus({ state: "starting", startedAt: null, error: null, filePath: null });
+    chunksRef.current = [];
+    canvas.width = PROGRAM_RECORDING_WIDTH;
+    canvas.height = PROGRAM_RECORDING_HEIGHT;
+    drawFrame();
+
+    const AudioContextConstructor = window.AudioContext;
+    const audioContext = new AudioContextConstructor({ sampleRate: 48_000 });
+    const audioDestination = audioContext.createMediaStreamDestination();
+    audioContextRef.current = audioContext;
+    audioDestinationRef.current = audioDestination;
+    syncAudioGraph();
+
+    const videoStream = canvas.captureStream(PROGRAM_RECORDING_FPS);
+    const recordingStream = new MediaStream([
+      ...videoStream.getVideoTracks(),
+      ...audioDestination.stream.getAudioTracks()
+    ]);
+    const recorder = new MediaRecorder(recordingStream, {
+      mimeType,
+      videoBitsPerSecond: PROGRAM_RECORDING_VIDEO_BITRATE,
+      audioBitsPerSecond: PROGRAM_RECORDING_AUDIO_BITRATE
+    });
+
+    mediaRecorderRef.current = recorder;
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunksRef.current.push(event.data);
+      }
+    };
+    recorder.onerror = () => {
+      cleanupRecording();
+      setStatus({
+        state: "error",
+        startedAt: null,
+        error: "Erreur pendant l’enregistrement Program."
+      });
+    };
+    recorder.onstop = () => {
+      const chunks = chunksRef.current;
+      const fileName = formatProgramRecordingFileName(new Date());
+
+      setStatus({ ...statusRef.current, state: "saving" });
+      cleanupRecording();
+
+      void new Blob(chunks, { type: mimeType })
+        .arrayBuffer()
+        .then((bytes) => desktopApi.saveProgramRecording!({ bytes, fileName }))
+        .then((result) => {
+          setStatus({
+            state: "idle",
+            startedAt: null,
+            filePath: result.filePath,
+            error: null
+          });
+        })
+        .catch((error) => {
+          setStatus({
+            state: "error",
+            startedAt: null,
+            error: error instanceof Error ? error.message : "Impossible d’écrire le MP4."
+          });
+        });
+    };
+
+    recorder.start(1000);
+    drawIntervalRef.current = window.setInterval(drawFrame, 1000 / PROGRAM_RECORDING_FPS);
+    setStatus({ state: "recording", startedAt: Date.now(), error: null, filePath: null });
+  };
+
+  useEffect(() => {
+    if (!recordingCommand || handledCommandIdRef.current === recordingCommand.requestId) {
+      return;
+    }
+
+    handledCommandIdRef.current = recordingCommand.requestId;
+
+    if (recordingCommand.action === "start") {
+      void startRecording();
+    } else {
+      stopRecording();
+    }
+  });
+
+  useEffect(() => {
+    return () => {
+      cleanupRecording();
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={PROGRAM_RECORDING_WIDTH}
+      height={PROGRAM_RECORDING_HEIGHT}
+      className="hidden"
+    />
+  );
+}
+
 function ProgramOutputContent({ programGuestIds }: { programGuestIds: string[] }) {
   const { selectedVideoSlots } = useSelectedProgramMedia(programGuestIds);
 
@@ -1223,6 +1672,8 @@ function ControlGuestGridContent({
   onDisconnectGuest,
   onPresentGuestIdsChange,
   onLiveGuestStatesChange,
+  recordingCommand,
+  onRecordingStatusChange,
   programAudioOutputDeviceId,
   regieMonitorOutputDeviceId,
   gridClassName
@@ -1237,6 +1688,8 @@ function ControlGuestGridContent({
   | "onDisconnectGuest"
   | "onPresentGuestIdsChange"
   | "onLiveGuestStatesChange"
+  | "recordingCommand"
+  | "onRecordingStatusChange"
   | "programAudioOutputDeviceId"
   | "regieMonitorOutputDeviceId"
   | "gridClassName"
@@ -1342,6 +1795,13 @@ function ControlGuestGridContent({
   return (
     <>
       <div className="hidden">
+        <ProgramRecordingBridge
+          guests={guests}
+          participantTrackMap={participantTrackMap}
+          participantAudioTrackMap={participantAudioTrackMap}
+          recordingCommand={recordingCommand}
+          onRecordingStatusChange={onRecordingStatusChange}
+        />
         {programAudioTracks.map((trackRef) => (
           <RoutedAudioTrack
             key={`program-${trackRef.publication.trackSid ?? trackRef.participant.identity}`}
@@ -1690,6 +2150,8 @@ export function ControlGuestGridSurface({
   onDisconnectGuest,
   onPresentGuestIdsChange,
   onLiveGuestStatesChange,
+  recordingCommand,
+  onRecordingStatusChange,
   programAudioOutputDeviceId,
   regieMonitorOutputDeviceId,
   gridClassName,
@@ -1713,6 +2175,8 @@ export function ControlGuestGridSurface({
         onDisconnectGuest={onDisconnectGuest}
         onPresentGuestIdsChange={onPresentGuestIdsChange}
         onLiveGuestStatesChange={onLiveGuestStatesChange}
+        recordingCommand={recordingCommand}
+        onRecordingStatusChange={onRecordingStatusChange}
         programAudioOutputDeviceId={programAudioOutputDeviceId}
         regieMonitorOutputDeviceId={regieMonitorOutputDeviceId}
         gridClassName={gridClassName}

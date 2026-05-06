@@ -23,6 +23,7 @@ const CONTROL_WINDOW_WIDTH = CONTROL_TILE_WIDTH * 3 + CONTROL_TILE_GAP * 2 + CON
 const CONTROL_WINDOW_HEIGHT = 1080;
 const CONTROL_WINDOW_MIN_HEIGHT = 960;
 const SLIDE_RECEIVER_TIMEOUT_MS = 10_000;
+const PROGRAM_RECORDING_DIR_NAME = "MSTV Visio";
 
 let nextServerProcess = null;
 let controlWindow = null;
@@ -1018,6 +1019,34 @@ function configureDesktopIpc() {
   ipcMain.handle("mstv:write-clipboard-text", (_event, text) => {
     clipboard.writeText(String(text || ""));
     return { ok: true };
+  });
+
+  ipcMain.handle("mstv:save-program-recording", async (_event, input) => {
+    const bytes = input?.bytes;
+    const requestedFileName = String(input?.fileName || "");
+    const safeFileName = /^MSTV-Program-\d{4}-\d{2}-\d{2}-\d{6}\.mp4$/.test(requestedFileName)
+      ? requestedFileName
+      : `MSTV-Program-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}.mp4`;
+
+    if (!(bytes instanceof ArrayBuffer) || bytes.byteLength === 0) {
+      throw new Error("Recording data is empty.");
+    }
+
+    const outputDir = path.join(app.getPath("movies"), PROGRAM_RECORDING_DIR_NAME);
+    const outputPath = path.join(outputDir, safeFileName);
+
+    await fs.promises.mkdir(outputDir, { recursive: true });
+    await fs.promises.writeFile(outputPath, Buffer.from(bytes));
+
+    log("Program recording saved", {
+      outputPath,
+      byteLength: bytes.byteLength
+    });
+
+    return {
+      ok: true,
+      filePath: outputPath
+    };
   });
 
   ipcMain.handle("mstv:send-slide-command", async (_event, input) => {
