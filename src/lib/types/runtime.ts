@@ -22,6 +22,21 @@ export interface SlideControlCommandMessage {
   createdAt: string;
 }
 
+export type PrivateChatSenderRole = "control" | "guest";
+
+export interface PrivateChatMessage {
+  type: "private-chat-message";
+  messageId: string;
+  room: string;
+  body: string;
+  fromParticipantId: string;
+  fromName: string;
+  fromRole: PrivateChatSenderRole;
+  targetParticipantId: string;
+  targetRole: PrivateChatSenderRole;
+  createdAt: string;
+}
+
 export interface TrackRuntimeState {
   published: boolean;
   muted: boolean;

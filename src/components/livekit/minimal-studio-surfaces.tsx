@@ -21,6 +21,7 @@ import type {
   GuestVideoFraming,
   LiveRoomSnapshot,
   PendingSlideControlCommand,
+  PrivateChatMessage,
   ReturnSource,
   RuntimeParticipantState,
   SlideControlCommandMessage,
@@ -38,6 +39,9 @@ interface GuestContributionSurfaceProps extends BaseSessionProps {
   onSnapshot?: (snapshot: LiveRoomSnapshot) => void;
   pendingCommand?: StudioControlCommand | null;
   onCommandApplied?: (commandId: string) => void;
+  pendingPrivateChatMessage?: PrivateChatMessage | null;
+  onPrivateChatMessageSent?: (messageId: string) => void;
+  onPrivateChatMessageReceived?: (message: PrivateChatMessage) => void;
 }
 
 interface ProgramReturnSurfaceProps extends BaseSessionProps {
@@ -153,6 +157,29 @@ interface ProgramReturnRoutingPayload {
   slideControlEnabledGuestIds?: string[];
   guestReturnOverrides: Record<string, ReturnSource | undefined>;
   routingVersion: number;
+}
+
+const privateChatTopic = "mstv:private-chat";
+
+function createMessageId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function formatChatTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function buildRemoteParticipantStates(remoteParticipants: ReturnType<typeof useRemoteParticipants>) {
@@ -382,6 +409,75 @@ function LocalPreviewContent({
   ) : (
     <div className="h-full w-full bg-neutral-950" />
   );
+}
+
+function GuestPrivateChatBridge({
+  pendingMessage,
+  onMessageSent,
+  onMessageReceived
+}: {
+  pendingMessage?: PrivateChatMessage | null;
+  onMessageSent?: (messageId: string) => void;
+  onMessageReceived?: (message: PrivateChatMessage) => void;
+}) {
+  const room = useRoomContext();
+  const { localParticipant } = useLocalParticipant();
+  const lastSentMessageIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!pendingMessage || lastSentMessageIdRef.current === pendingMessage.messageId) {
+      return;
+    }
+
+    lastSentMessageIdRef.current = pendingMessage.messageId;
+    void localParticipant
+      .publishData(new TextEncoder().encode(JSON.stringify(pendingMessage)), {
+        reliable: true,
+        topic: privateChatTopic
+      })
+      .finally(() => {
+        onMessageSent?.(pendingMessage.messageId);
+      });
+  }, [localParticipant, onMessageSent, pendingMessage]);
+
+  useEffect(() => {
+    if (!room || !onMessageReceived) {
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    const handleData = (payload: Uint8Array, participant?: { identity: string }, _kind?: unknown, topic?: string) => {
+      if (topic !== privateChatTopic) {
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(decoder.decode(payload)) as PrivateChatMessage;
+
+        if (
+          parsed.type !== "private-chat-message" ||
+          parsed.targetRole !== "guest" ||
+          parsed.targetParticipantId !== localParticipant.identity ||
+          parsed.fromParticipantId === localParticipant.identity ||
+          participant?.identity === localParticipant.identity
+        ) {
+          return;
+        }
+
+        onMessageReceived(parsed);
+      } catch {
+        // Ignore unrelated or malformed data messages.
+      }
+    };
+
+    room.on(RoomEvent.DataReceived, handleData);
+
+    return () => {
+      room.off(RoomEvent.DataReceived, handleData);
+    };
+  }, [localParticipant.identity, onMessageReceived, room]);
+
+  return null;
 }
 
 function ProgramReturnContent({
@@ -1806,7 +1902,12 @@ function ControlGuestGridContent({
 >) {
   const remoteParticipants = useRemoteParticipants();
   const room = useRoomContext();
+  const { localParticipant } = useLocalParticipant();
   const [connectionQualityVersion, setConnectionQualityVersion] = useState(0);
+  const [activeChatGuestId, setActiveChatGuestId] = useState<string | null>(null);
+  const [chatDrafts, setChatDrafts] = useState<Record<string, string>>({});
+  const [chatMessagesByGuest, setChatMessagesByGuest] = useState<Record<string, PrivateChatMessage[]>>({});
+  const [unreadChatByGuest, setUnreadChatByGuest] = useState<Record<string, number>>({});
   const videoTracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }]);
   const audioTracks = useTracks([{ source: Track.Source.Microphone, withPlaceholder: false }]);
   const concreteVideoTracks = videoTracks.filter(
@@ -1847,6 +1948,73 @@ function ControlGuestGridContent({
   );
   const lastReportedPresentGuestsRef = useRef<string | null>(null);
   const lastReportedLiveGuestsRef = useRef<string | null>(null);
+  const activeChatGuestIdRef = useRef<string | null>(activeChatGuestId);
+
+  useEffect(() => {
+    activeChatGuestIdRef.current = activeChatGuestId;
+  }, [activeChatGuestId]);
+
+  function appendPrivateChatMessage(guestId: string, message: PrivateChatMessage) {
+    setChatMessagesByGuest((current) => {
+      const existingMessages = current[guestId] ?? [];
+
+      if (existingMessages.some((existingMessage) => existingMessage.messageId === message.messageId)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [guestId]: [...existingMessages, message].slice(-30)
+      };
+    });
+  }
+
+  function handleOpenGuestChat(guestId: string) {
+    setActiveChatGuestId((current) => (current === guestId ? null : guestId));
+    setUnreadChatByGuest((current) => ({
+      ...current,
+      [guestId]: 0
+    }));
+  }
+
+  function handleSendControlChatMessage(guestId: string, guestName: string) {
+    const body = (chatDrafts[guestId] ?? "").trim();
+
+    if (!body) {
+      return;
+    }
+
+    const message: PrivateChatMessage = {
+      type: "private-chat-message",
+      messageId: createMessageId(),
+      room: room.name.replace(/--contribution$/, ""),
+      body,
+      fromParticipantId: localParticipant.identity,
+      fromName: localParticipant.name || "Régie",
+      fromRole: "control",
+      targetParticipantId: guestId,
+      targetRole: "guest",
+      createdAt: new Date().toISOString()
+    };
+
+    appendPrivateChatMessage(guestId, message);
+    setChatDrafts((current) => ({
+      ...current,
+      [guestId]: ""
+    }));
+
+    void localParticipant.publishData(new TextEncoder().encode(JSON.stringify(message)), {
+      reliable: true,
+      destinationIdentities: [guestId],
+      topic: privateChatTopic
+    }).catch(() => {
+      appendPrivateChatMessage(guestId, {
+        ...message,
+        messageId: `${message.messageId}-error`,
+        body: `Message non envoyé à ${guestName}.`
+      });
+    });
+  }
 
   useEffect(() => {
     const handleConnectionQualityChanged = () => {
@@ -1894,6 +2062,53 @@ function ControlGuestGridContent({
     onLiveGuestStatesChange(liveGuestStates);
   }, [connectionQualityVersion, onLiveGuestStatesChange, remoteParticipants]);
 
+  useEffect(() => {
+    const decoder = new TextDecoder();
+
+    const handleData = (payload: Uint8Array, participant?: { identity: string; name?: string }, _kind?: unknown, topic?: string) => {
+      if (topic !== privateChatTopic) {
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(decoder.decode(payload)) as PrivateChatMessage;
+
+        if (
+          parsed.type !== "private-chat-message" ||
+          parsed.targetRole !== "control" ||
+          parsed.fromRole !== "guest" ||
+          !participant?.identity
+        ) {
+          return;
+        }
+
+        const guestId = participant.identity;
+        const normalizedMessage: PrivateChatMessage = {
+          ...parsed,
+          fromParticipantId: guestId,
+          fromName: participant.name || parsed.fromName || guestId
+        };
+
+        appendPrivateChatMessage(guestId, normalizedMessage);
+
+        if (activeChatGuestIdRef.current !== guestId) {
+          setUnreadChatByGuest((current) => ({
+            ...current,
+            [guestId]: (current[guestId] ?? 0) + 1
+          }));
+        }
+      } catch {
+        // Ignore unrelated or malformed data messages.
+      }
+    };
+
+    room.on(RoomEvent.DataReceived, handleData);
+
+    return () => {
+      room.off(RoomEvent.DataReceived, handleData);
+    };
+  }, [room]);
+
   if (guests.length === 0) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] text-sm uppercase tracking-[0.24em] text-slate-500">
@@ -1938,6 +2153,9 @@ function ControlGuestGridContent({
               ? participantAudioTrackMap.get(guest.participantId)
               : undefined;
         const audibleAudioTrack = audibleAudioTrackRef ? getMediaStreamTrack(audibleAudioTrackRef) : null;
+        const chatMessages = chatMessagesByGuest[guest.participantId] ?? [];
+        const unreadChatCount = unreadChatByGuest[guest.participantId] ?? 0;
+        const chatIsOpen = activeChatGuestId === guest.participantId;
         const selectionLimitReached = !guest.inProgram && guests.filter((item) => item.inProgram).length >= 3;
         const activeActionPillClassName =
           "border-transparent bg-sky-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]";
@@ -2090,6 +2308,78 @@ function ControlGuestGridContent({
                 </div>
               )}
 
+              {chatIsOpen ? (
+                <div
+                  className="absolute right-4 top-16 z-40 w-[min(20rem,calc(100%-2rem))] rounded-2xl border border-white/10 bg-black/85 p-3 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-md"
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white">
+                      Chat
+                    </p>
+                    <button
+                      type="button"
+                      className="rounded-full bg-slate-700 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-slate-500"
+                      onClick={() => setActiveChatGuestId(null)}
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                  <div className="mb-2 max-h-28 space-y-1.5 overflow-y-auto pr-1">
+                    {chatMessages.length > 0 ? (
+                      chatMessages.slice(-5).map((message) => (
+                        <div
+                          key={message.messageId}
+                          className={`rounded-xl px-2.5 py-1.5 text-[11px] ${
+                            message.fromRole === "control"
+                              ? "ml-4 bg-sky-500 text-white"
+                              : "mr-4 bg-white/10 text-slate-100"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 text-[9px] font-bold uppercase tracking-[0.12em] opacity-75">
+                            <span>{message.fromRole === "control" ? "Régie" : "Invité"}</span>
+                            <span>{formatChatTime(message.createdAt)}</span>
+                          </div>
+                          <p className="mt-0.5 leading-snug">{message.body}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-xl bg-white/5 px-2.5 py-2 text-[11px] text-slate-400">
+                        Aucun message.
+                      </p>
+                    )}
+                  </div>
+                  <form
+                    className="flex gap-1.5"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      handleSendControlChatMessage(guest.participantId, guest.displayName);
+                    }}
+                  >
+                    <input
+                      value={chatDrafts[guest.participantId] ?? ""}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        setChatDrafts((current) => ({
+                          ...current,
+                          [guest.participantId]: nextValue
+                        }));
+                      }}
+                      placeholder="Message..."
+                      className="min-w-0 flex-1 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] text-white outline-none placeholder:text-slate-500 focus:border-sky-400"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-full bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-sky-400"
+                    >
+                      Envoyer
+                    </button>
+                  </form>
+                </div>
+              ) : null}
+
               <div className="absolute bottom-0 left-0 right-0 z-20 flex items-end gap-3 p-4">
                 <div className="w-[30%] min-w-0 max-w-[11rem] shrink-0">
                   <p className="truncate text-base font-semibold text-white" title={guest.displayName}>
@@ -2127,6 +2417,20 @@ function ControlGuestGridContent({
                       })}
                     </div>
                     <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenGuestChat(guest.participantId);
+                        }}
+                        className={`${pillBaseClassName} transition ${
+                          chatIsOpen || unreadChatCount > 0
+                            ? activeActionPillClassName
+                            : neutralPillClassName
+                        }`}
+                      >
+                        {unreadChatCount > 0 ? `Chat ${unreadChatCount}` : "Chat"}
+                      </button>
                       <button
                         type="button"
                         onClick={(event) => {
@@ -2183,6 +2487,9 @@ export function GuestContributionSurface({
   onSnapshot,
   pendingCommand,
   onCommandApplied,
+  pendingPrivateChatMessage,
+  onPrivateChatMessageSent,
+  onPrivateChatMessageReceived,
   emptyClassName = "h-full w-full bg-neutral-950"
 }: GuestContributionSurfaceProps) {
   return session ? (
@@ -2200,6 +2507,11 @@ export function GuestContributionSurface({
         onSnapshot={onSnapshot}
         pendingCommand={pendingCommand}
         onCommandApplied={onCommandApplied}
+      />
+      <GuestPrivateChatBridge
+        pendingMessage={pendingPrivateChatMessage}
+        onMessageSent={onPrivateChatMessageSent}
+        onMessageReceived={onPrivateChatMessageReceived}
       />
     </LiveKitRoom>
   ) : (

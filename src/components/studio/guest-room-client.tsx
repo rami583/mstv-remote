@@ -14,6 +14,7 @@ import type {
   LiveRoomSnapshot,
   PendingSlideControlCommand,
   ProductionSnapshot,
+  PrivateChatMessage,
   ReturnSource,
   SlideControlCommandType,
   StudioControlCommand
@@ -116,6 +117,27 @@ function LocalStreamPreview({ stream }: { stream: MediaStream }) {
   return <video ref={videoRef} muted playsInline autoPlay className="h-full w-full object-cover object-center" />;
 }
 
+function createMessageId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function formatChatTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 export function GuestRoomClient({ room }: GuestRoomClientProps) {
   const [guestName, setGuestName] = useState("");
   const [greenRoomStream, setGreenRoomStream] = useState<MediaStream | null>(null);
@@ -144,6 +166,12 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
   const [slideControlAuthorized, setSlideControlAuthorized] = useState(false);
   const [pendingSlideCommand, setPendingSlideCommand] =
     useState<PendingSlideControlCommand | null>(null);
+  const [privateChatMessages, setPrivateChatMessages] = useState<PrivateChatMessage[]>([]);
+  const [privateChatDraft, setPrivateChatDraft] = useState("");
+  const [pendingPrivateChatMessage, setPendingPrivateChatMessage] =
+    useState<PrivateChatMessage | null>(null);
+  const [privateChatOpen, setPrivateChatOpen] = useState(false);
+  const [privateChatUnreadCount, setPrivateChatUnreadCount] = useState(0);
   const [isJoiningLive, setIsJoiningLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastSlideCommandAtRef = useRef(0);
@@ -473,6 +501,58 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
     });
   }
 
+  function appendPrivateChatMessage(message: PrivateChatMessage) {
+    setPrivateChatMessages((current) => {
+      if (current.some((existingMessage) => existingMessage.messageId === message.messageId)) {
+        return current;
+      }
+
+      return [...current, message].slice(-30);
+    });
+  }
+
+  function handlePrivateChatReceived(message: PrivateChatMessage) {
+    appendPrivateChatMessage(message);
+
+    if (!privateChatOpen) {
+      setPrivateChatUnreadCount((count) => count + 1);
+    }
+  }
+
+  function handleSendPrivateChatMessage() {
+    if (!identity) {
+      return;
+    }
+
+    const body = privateChatDraft.trim();
+
+    if (!body) {
+      return;
+    }
+
+    const message: PrivateChatMessage = {
+      type: "private-chat-message",
+      messageId: createMessageId(),
+      room,
+      body,
+      fromParticipantId: identity.contribution.participantId,
+      fromName: identity.displayName,
+      fromRole: "guest",
+      targetParticipantId: "control",
+      targetRole: "control",
+      createdAt: new Date().toISOString()
+    };
+
+    appendPrivateChatMessage(message);
+    setPrivateChatDraft("");
+    setPendingPrivateChatMessage(message);
+  }
+
+  function handleTogglePrivateChat() {
+    setPrivateChatOpen((current) => !current);
+    setPrivateChatUnreadCount(0);
+  }
+
   const handleProgramGuestIdsChange = useCallback((nextProgramGuestIds: string[]) => {
     setLiveProgramGuestIds((current) => {
       if (
@@ -675,6 +755,13 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                     setPendingMuteCommand(null);
                   });
                 }}
+                pendingPrivateChatMessage={pendingPrivateChatMessage}
+                onPrivateChatMessageSent={(messageId) => {
+                  setPendingPrivateChatMessage((current) =>
+                    current?.messageId === messageId ? null : current
+                  );
+                }}
+                onPrivateChatMessageReceived={handlePrivateChatReceived}
               />
               <LocalPreviewGuide />
 
@@ -707,6 +794,77 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               ))}
             </div>
           ) : null}
+
+          <div className="absolute left-2 top-2 z-30 w-[min(320px,calc(100%-1rem))] md:left-3 md:top-3">
+            {privateChatOpen ? (
+              <div className="rounded-2xl border border-white/10 bg-black/80 p-3 shadow-[0_18px_48px_rgba(0,0,0,0.35)] backdrop-blur-md">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white">
+                    Chat régie
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleTogglePrivateChat}
+                    className="rounded-full bg-slate-700 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-slate-500"
+                  >
+                    Réduire
+                  </button>
+                </div>
+                <div className="mb-2 max-h-28 space-y-1.5 overflow-y-auto pr-1">
+                  {privateChatMessages.length > 0 ? (
+                    privateChatMessages.slice(-5).map((message) => (
+                      <div
+                        key={message.messageId}
+                        className={`rounded-xl px-2.5 py-1.5 text-[11px] ${
+                          message.fromRole === "guest"
+                            ? "ml-4 bg-sky-500 text-white"
+                            : "mr-4 bg-white/10 text-slate-100"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 text-[9px] font-bold uppercase tracking-[0.12em] opacity-75">
+                          <span>{message.fromRole === "guest" ? "Vous" : "Régie"}</span>
+                          <span>{formatChatTime(message.createdAt)}</span>
+                        </div>
+                        <p className="mt-0.5 leading-snug">{message.body}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="rounded-xl bg-white/5 px-2.5 py-2 text-[11px] text-slate-400">
+                      Aucun message.
+                    </p>
+                  )}
+                </div>
+                <form
+                  className="flex gap-1.5"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleSendPrivateChatMessage();
+                  }}
+                >
+                  <input
+                    value={privateChatDraft}
+                    onChange={(event) => setPrivateChatDraft(event.target.value)}
+                    placeholder="Répondre..."
+                    className="min-w-0 flex-1 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] text-white outline-none placeholder:text-slate-500 focus:border-sky-400"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-full bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-sky-400"
+                  >
+                    Envoyer
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleTogglePrivateChat}
+                className="rounded-full border border-transparent bg-slate-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition hover:bg-slate-500"
+              >
+                {privateChatUnreadCount > 0 ? `Chat ${privateChatUnreadCount}` : "Chat"}
+              </button>
+            )}
+          </div>
 
         </div>
         {slideControlAuthorized ? (
