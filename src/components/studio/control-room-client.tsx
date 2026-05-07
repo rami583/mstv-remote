@@ -1432,6 +1432,45 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         .map((guest) => guest.participantId),
     [guests]
   );
+  const companionStatusPayload = useMemo(() => {
+    const guestIndexById = new Map(
+      guests.slice(0, 9).map((guest, index) => [guest.participantId, index + 1])
+    );
+    const toGuestIndexes = (guestIds: string[]) =>
+      guestIds
+        .map((guestId) => guestIndexById.get(guestId) ?? null)
+        .filter((guestIndex): guestIndex is number => guestIndex !== null);
+    const programGuestIndexes = toGuestIndexes(programGuestIds);
+    const programMutedGuestIndexes = toGuestIndexes(
+      programGuestIds.filter((guestId) => programMutedGuestIds.includes(guestId))
+    );
+    const regieGuestIndexes = toGuestIndexes(activeRegieGuestIds);
+    const regieMutedGuestIndexes = toGuestIndexes(
+      activeRegieGuestIds.filter((guestId) => regieMutedGuestIds.includes(guestId))
+    );
+    const audibleGuestIds = [...programGuestIds, ...activeRegieGuestIds];
+    const globalMuteEnabled =
+      audibleGuestIds.length > 0 &&
+      programGuestIds.every((guestId) => programMutedGuestIds.includes(guestId)) &&
+      activeRegieGuestIds.every((guestId) => regieMutedGuestIds.includes(guestId));
+
+    return {
+      pipEnabled: pipModeEnabled,
+      globalMuteEnabled,
+      programGuestIndexes,
+      programMutedGuestIndexes,
+      regieGuestIndexes,
+      regieMutedGuestIndexes,
+      connectedGuestCount: guests.length
+    };
+  }, [
+    activeRegieGuestIds,
+    guests,
+    pipModeEnabled,
+    programGuestIds,
+    programMutedGuestIds,
+    regieMutedGuestIds
+  ]);
   const studioInputStatuses = {
     STUDIO: getStudioInputStatus("STUDIO"),
     REGIE: getStudioInputStatus("REGIE"),
@@ -1493,6 +1532,32 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       return areGuestListsEqual(current, next) ? current : next;
     });
   }, [activeRegieGuestIds]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function publishCompanionStatus() {
+      try {
+        await fetch("/api/companion/status", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(companionStatusPayload)
+        });
+      } catch {
+        // Companion feedback is optional and must never affect live operation.
+      }
+    }
+
+    if (active) {
+      void publishCompanionStatus();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [companionStatusPayload]);
 
   const routingPayload = useMemo(
     () =>
