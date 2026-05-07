@@ -135,16 +135,6 @@ export interface ReturnFeedPublisherState {
   error: string | null;
 }
 
-export interface ReturnFeedPublisherDebugState {
-  selectedVideoDeviceId: string | null;
-  selectedAudioDeviceId: string | null;
-  getUserMediaState: "idle" | "requesting" | "resolved" | "failed";
-  getUserMediaError: string | null;
-  videoTrackCreated: boolean;
-  videoTrackReadyState: string | null;
-  previewStreamHasVideo: boolean;
-}
-
 export interface ProgramRecordingCommand {
   action: "start" | "stop";
   requestId: number;
@@ -1563,8 +1553,7 @@ export function ControlReturnFeedPublisher({
   imageDataUrl,
   enabled,
   onStateChange,
-  onPreviewStreamChange,
-  onDebugStateChange
+  onPreviewStreamChange
 }: {
   session: TokenResponsePayload | null;
   videoDeviceId: string | null;
@@ -1573,7 +1562,6 @@ export function ControlReturnFeedPublisher({
   enabled: boolean;
   onStateChange?: (state: Partial<ReturnFeedPublisherState>) => void;
   onPreviewStreamChange?: (stream: MediaStream | null) => void;
-  onDebugStateChange?: (state: Partial<ReturnFeedPublisherDebugState>) => void;
 }) {
   const publisherRoomRef = useRef<Room | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -1585,7 +1573,6 @@ export function ControlReturnFeedPublisher({
   const syncRequestIdRef = useRef(0);
   const onStateChangeRef = useRef(onStateChange);
   const onPreviewStreamChangeRef = useRef(onPreviewStreamChange);
-  const onDebugStateChangeRef = useRef(onDebugStateChange);
   const [publisherConnectionState, setPublisherConnectionState] = useState("disconnected");
 
   useEffect(() => {
@@ -1597,17 +1584,6 @@ export function ControlReturnFeedPublisher({
   }, [onPreviewStreamChange]);
 
   useEffect(() => {
-    onDebugStateChangeRef.current = onDebugStateChange;
-  }, [onDebugStateChange]);
-
-  useEffect(() => {
-    onDebugStateChangeRef.current?.({
-      selectedVideoDeviceId: videoDeviceId,
-      selectedAudioDeviceId: audioDeviceId
-    });
-  }, [audioDeviceId, videoDeviceId]);
-
-  useEffect(() => {
     if (!session || !enabled) {
       setPublisherConnectionState("disconnected");
       onStateChangeRef.current?.({
@@ -1617,13 +1593,6 @@ export function ControlReturnFeedPublisher({
         error: null
       });
       onPreviewStreamChangeRef.current?.(null);
-      onDebugStateChangeRef.current?.({
-        getUserMediaState: "idle",
-        getUserMediaError: null,
-        videoTrackCreated: false,
-        videoTrackReadyState: null,
-        previewStreamHasVideo: false
-      });
       return;
     }
 
@@ -1699,19 +1668,12 @@ export function ControlReturnFeedPublisher({
   useEffect(() => {
     let cancelled = false;
 
-    async function unpublishVideoTrack(room: Room | null, reason: string) {
+    async function unpublishVideoTrack(room: Room | null) {
       const previousVideoTrack = publishedVideoTrackRef.current;
 
       if (!previousVideoTrack) {
         return;
       }
-
-      console.info("[MSTV Return Publisher] unpublish video", JSON.stringify({
-        sourceLabel: session?.displayName ?? null,
-        reason,
-        trackId: previousVideoTrack.id,
-        readyState: previousVideoTrack.readyState
-      }));
 
       if (room) {
         await room.localParticipant.unpublishTrack(previousVideoTrack, false);
@@ -1722,19 +1684,12 @@ export function ControlReturnFeedPublisher({
       selectedVideoSourceRef.current = null;
     }
 
-    async function unpublishAudioTrack(room: Room | null, reason: string) {
+    async function unpublishAudioTrack(room: Room | null) {
       const previousAudioTrack = publishedAudioTrackRef.current;
 
       if (!previousAudioTrack) {
         return;
       }
-
-      console.info("[MSTV Return Publisher] unpublish audio", JSON.stringify({
-        sourceLabel: session?.displayName ?? null,
-        reason,
-        trackId: previousAudioTrack.id,
-        readyState: previousAudioTrack.readyState
-      }));
 
       if (room) {
         await room.localParticipant.unpublishTrack(previousAudioTrack, false);
@@ -1754,48 +1709,28 @@ export function ControlReturnFeedPublisher({
       imageRefreshIntervalRef.current = null;
     }
 
-    function publishPreviewState(reason: string) {
+    function publishPreviewState() {
       const previewTracks = [publishedVideoTrackRef.current, publishedAudioTrackRef.current].filter(
         (track): track is MediaStreamTrack => track !== null && track.readyState === "live"
       );
       const previewStream = previewTracks.length > 0 ? new MediaStream(previewTracks) : null;
       streamRef.current = previewStream;
 
-      console.info("[MSTV Return Publisher] preview stream updated", JSON.stringify({
-        sourceLabel: session?.displayName ?? null,
-        reason,
-        streamId: previewStream?.id ?? null,
-        videoTrackIds: previewStream?.getVideoTracks().map((track) => track.id) ?? [],
-        audioTrackIds: previewStream?.getAudioTracks().map((track) => track.id) ?? [],
-        videoReadyStates: previewStream?.getVideoTracks().map((track) => track.readyState) ?? [],
-        audioReadyStates: previewStream?.getAudioTracks().map((track) => track.readyState) ?? []
-      }));
-
       onPreviewStreamChangeRef.current?.(previewStream);
-      onDebugStateChangeRef.current?.({
-        videoTrackCreated: Boolean(publishedVideoTrackRef.current),
-        videoTrackReadyState: publishedVideoTrackRef.current?.readyState ?? null,
-        previewStreamHasVideo: (previewStream?.getVideoTracks().length ?? 0) > 0
-      });
       onStateChangeRef.current?.({
         videoActive: Boolean(publishedVideoTrackRef.current),
         audioActive: Boolean(publishedAudioTrackRef.current)
       });
     }
 
-    async function clearPublishedTracks(reason: string) {
+    async function clearPublishedTracks() {
       const room = publisherRoomRef.current;
 
-      await unpublishVideoTrack(room, reason);
-      await unpublishAudioTrack(room, reason);
+      await unpublishVideoTrack(room);
+      await unpublishAudioTrack(room);
       stopImageRefreshInterval();
       streamRef.current = null;
       onPreviewStreamChangeRef.current?.(null);
-      onDebugStateChangeRef.current?.({
-        videoTrackCreated: false,
-        videoTrackReadyState: null,
-        previewStreamHasVideo: false
-      });
     }
 
     async function syncSelectedDevices() {
@@ -1808,7 +1743,7 @@ export function ControlReturnFeedPublisher({
         !publisherRoomRef.current ||
         publisherConnectionState !== "connected"
       ) {
-        await clearPublishedTracks("publisher-not-ready");
+        await clearPublishedTracks();
         onStateChangeRef.current?.({
           videoActive: false,
           audioActive: false,
@@ -1822,7 +1757,7 @@ export function ControlReturnFeedPublisher({
       const hasImage = Boolean(imageDataUrl);
 
       if (!hasVideo && !hasAudio && !hasImage) {
-        await clearPublishedTracks("no-selected-source");
+        await clearPublishedTracks();
         onStateChangeRef.current?.({
           videoActive: false,
           audioActive: false,
@@ -1839,11 +1774,6 @@ export function ControlReturnFeedPublisher({
           : null;
       const videoSourceChanged = selectedVideoSourceRef.current !== nextVideoSource;
       const audioSourceChanged = selectedAudioDeviceIdRef.current !== (hasAudio ? audioDeviceId : null);
-
-      onDebugStateChangeRef.current?.({
-        getUserMediaState: "requesting",
-        getUserMediaError: null
-      });
 
       if (hasImage && videoSourceChanged) {
         stopImageRefreshInterval();
@@ -1894,7 +1824,7 @@ export function ControlReturnFeedPublisher({
           return;
         }
 
-        await unpublishVideoTrack(room, "image-source-changed");
+        await unpublishVideoTrack(room);
 
         if (nextImageVideoTrack) {
           await room.localParticipant.publishTrack(nextImageVideoTrack, {
@@ -1905,34 +1835,18 @@ export function ControlReturnFeedPublisher({
           selectedVideoSourceRef.current = nextVideoSource;
         }
       } else if (!hasImage && hasVideo && videoSourceChanged) {
-        console.info("[MSTV Return Publisher] video getUserMedia requesting", JSON.stringify({
-          sourceLabel: activeSession.displayName,
-          videoDeviceId,
-          previousVideoTrackId: publishedVideoTrackRef.current?.id ?? null,
-          previousVideoReadyState: publishedVideoTrackRef.current?.readyState ?? null
-        }));
         const nextVideoStream = await navigator.mediaDevices.getUserMedia({
           video: hasVideo ? { deviceId: { exact: videoDeviceId ?? undefined } } : false,
           audio: false
         });
         const nextVideoTrack = nextVideoStream.getVideoTracks()[0] ?? null;
-        console.info("[MSTV Return Publisher] video getUserMedia resolved", JSON.stringify({
-          sourceLabel: activeSession.displayName,
-          streamId: nextVideoStream.id,
-          videoTracks: nextVideoStream.getVideoTracks().map((track) => ({
-            id: track.id,
-            label: track.label,
-            readyState: track.readyState,
-            muted: track.muted
-          }))
-        }));
 
         if (cancelled || requestId !== syncRequestIdRef.current || !room) {
           nextVideoStream.getTracks().forEach((track) => track.stop());
           return;
         }
 
-        await unpublishVideoTrack(room, "video-source-changed");
+        await unpublishVideoTrack(room);
 
         if (nextVideoTrack) {
           await room.localParticipant.publishTrack(nextVideoTrack, {
@@ -1943,43 +1857,24 @@ export function ControlReturnFeedPublisher({
           selectedVideoSourceRef.current = nextVideoSource;
         }
       } else if (!hasImage && !hasVideo && publishedVideoTrackRef.current) {
-        await unpublishVideoTrack(room, "video-disabled");
+        await unpublishVideoTrack(room);
       }
 
       if (hasImage && publishedAudioTrackRef.current) {
-        await unpublishAudioTrack(room, "image-has-no-audio");
+        await unpublishAudioTrack(room);
       } else if (!hasImage && hasAudio && audioSourceChanged) {
-        console.info("[MSTV Return Publisher] audio getUserMedia requesting", JSON.stringify({
-          sourceLabel: activeSession.displayName,
-          audioDeviceId,
-          preservedVideoTrackId: publishedVideoTrackRef.current?.id ?? null,
-          preservedVideoReadyState: publishedVideoTrackRef.current?.readyState ?? null,
-          previousAudioTrackId: publishedAudioTrackRef.current?.id ?? null
-        }));
         const nextAudioStream = await navigator.mediaDevices.getUserMedia({
           video: false,
           audio: { deviceId: { exact: audioDeviceId ?? undefined } }
         });
         const nextAudioTrack = nextAudioStream.getAudioTracks()[0] ?? null;
-        console.info("[MSTV Return Publisher] audio getUserMedia resolved", JSON.stringify({
-          sourceLabel: activeSession.displayName,
-          streamId: nextAudioStream.id,
-          preservedVideoTrackId: publishedVideoTrackRef.current?.id ?? null,
-          preservedVideoReadyState: publishedVideoTrackRef.current?.readyState ?? null,
-          audioTracks: nextAudioStream.getAudioTracks().map((track) => ({
-            id: track.id,
-            label: track.label,
-            readyState: track.readyState,
-            muted: track.muted
-          }))
-        }));
 
         if (cancelled || requestId !== syncRequestIdRef.current || !room) {
           nextAudioStream.getTracks().forEach((track) => track.stop());
           return;
         }
 
-        await unpublishAudioTrack(room, "audio-source-changed");
+        await unpublishAudioTrack(room);
 
         if (nextAudioTrack) {
           await room.localParticipant.publishTrack(nextAudioTrack, {
@@ -1990,15 +1885,11 @@ export function ControlReturnFeedPublisher({
           selectedAudioDeviceIdRef.current = audioDeviceId;
         }
       } else if (!hasImage && !hasAudio && publishedAudioTrackRef.current) {
-        await unpublishAudioTrack(room, "audio-disabled");
+        await unpublishAudioTrack(room);
       }
 
-      publishPreviewState(videoSourceChanged ? "video-source-sync" : audioSourceChanged ? "audio-source-sync" : "source-state-sync");
+      publishPreviewState();
 
-      onDebugStateChangeRef.current?.({
-        getUserMediaState: "resolved",
-        getUserMediaError: null
-      });
       onStateChangeRef.current?.({
         videoActive: Boolean(publishedVideoTrackRef.current),
         audioActive: Boolean(publishedAudioTrackRef.current),
@@ -2011,25 +1902,11 @@ export function ControlReturnFeedPublisher({
         return;
       }
 
-      onDebugStateChangeRef.current?.({
-        getUserMediaState: "failed",
-        getUserMediaError: getMediaCaptureErrorMessage(error),
-        videoTrackCreated: Boolean(publishedVideoTrackRef.current),
-        videoTrackReadyState: publishedVideoTrackRef.current?.readyState ?? null,
-        previewStreamHasVideo: Boolean(publishedVideoTrackRef.current)
-      });
       onStateChangeRef.current?.({
         videoActive: Boolean(publishedVideoTrackRef.current),
         audioActive: Boolean(publishedAudioTrackRef.current),
         error: getMediaCaptureErrorMessage(error)
       });
-      console.info("[MSTV Return Publisher] getUserMedia failed", JSON.stringify({
-        sourceLabel: session?.displayName ?? null,
-        videoDeviceId,
-        audioDeviceId,
-        name: error instanceof DOMException ? error.name : error instanceof Error ? error.name : null,
-        message: error instanceof Error ? error.message : String(error)
-      }));
     });
 
     return () => {

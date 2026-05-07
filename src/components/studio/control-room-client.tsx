@@ -8,7 +8,6 @@ import {
   type GuestVideoFramingAction,
   type ProgramRecordingCommand,
   type ProgramRecordingStatus,
-  type ReturnFeedPublisherDebugState,
   type ReturnFeedPublisherState
 } from "@/components/livekit/minimal-studio-surfaces";
 import { AudioLevelMeter } from "@/components/studio/audio-level-meter";
@@ -215,79 +214,6 @@ function loadStoredStudioInputs(): Record<ReturnSource, StudioInputConfig> {
   }
 }
 
-function useStudioInputPreview(videoDeviceId: string | null, enabled: boolean) {
-  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    let currentStream: MediaStream | null = null;
-
-    async function loadPreview() {
-      if (!enabled || !videoDeviceId) {
-        setPreviewStream(null);
-        setError(null);
-        return;
-      }
-
-      try {
-        console.info("[MSTV Control] Preview getUserMedia requesting", JSON.stringify({
-          videoDeviceId
-        }));
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: videoDeviceId } },
-          audio: false
-        });
-        console.info("[MSTV Control] Preview getUserMedia resolved", JSON.stringify({
-          videoDeviceId,
-          videoTracks: stream.getVideoTracks().map((track) => ({
-            label: track.label,
-            readyState: track.readyState,
-            muted: track.muted
-          }))
-        }));
-
-        if (!active) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-
-        currentStream = stream;
-        setPreviewStream(stream);
-        setError(null);
-      } catch (previewError) {
-        if (!active) {
-          return;
-        }
-
-        console.info("[MSTV Control] Preview getUserMedia failed", JSON.stringify({
-          videoDeviceId,
-          name: previewError instanceof DOMException ? previewError.name : previewError instanceof Error ? previewError.name : null,
-          message: previewError instanceof Error ? previewError.message : String(previewError)
-        }));
-        setPreviewStream(null);
-        setError(
-          previewError instanceof Error
-            ? previewError.message
-            : "Impossible d’ouvrir cette entrée vidéo."
-        );
-      }
-    }
-
-    void loadPreview();
-
-    return () => {
-      active = false;
-      currentStream?.getTracks().forEach((track) => track.stop());
-    };
-  }, [enabled, videoDeviceId]);
-
-  return {
-    previewStream,
-    error
-  };
-}
-
 function isAcceptedImageFile(file: File) {
   const acceptedMimeTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
   const acceptedExtensions = /\.(png|jpe?g|webp)$/i;
@@ -326,7 +252,6 @@ function StudioInputTile(input: {
   audioInputs: MediaDeviceOption[];
   selectedVideoInputId: string | null;
   selectedAudioInputId: string | null;
-  imageFileName?: string | null;
   onSelectVideoInput: (value: string | null) => void;
   onSelectAudioInput: (value: string | null) => void;
   onSelectImageFile?: (file: File | null) => void;
@@ -362,16 +287,6 @@ function StudioInputTile(input: {
         setPreviewVideoReady(true);
       }
     };
-
-    console.info("[MSTV Control] Studio input preview srcObject assignment", JSON.stringify({
-      label: input.label,
-      streamId: input.previewStream?.id ?? null,
-      nextVideoTrackId,
-      previousVideoTrackId: previewVideoTrackIdRef.current,
-      videoTrackChanged,
-      currentVideoWidth: element.videoWidth,
-      currentVideoHeight: element.videoHeight
-    }));
 
     element.srcObject = input.previewStream;
     previewVideoTrackIdRef.current = nextVideoTrackId;
@@ -944,37 +859,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     REGIE: { connectionState: "disconnected", videoActive: false, audioActive: false, error: null },
     IMAGE: { connectionState: "disconnected", videoActive: false, audioActive: false, error: null }
   });
-  const [returnFeedDebugStates, setReturnFeedDebugStates] = useState<
-    Record<ReturnSource, ReturnFeedPublisherDebugState>
-  >({
-    STUDIO: {
-      selectedVideoDeviceId: null,
-      selectedAudioDeviceId: null,
-      getUserMediaState: "idle",
-      getUserMediaError: null,
-      videoTrackCreated: false,
-      videoTrackReadyState: null,
-      previewStreamHasVideo: false
-    },
-    REGIE: {
-      selectedVideoDeviceId: null,
-      selectedAudioDeviceId: null,
-      getUserMediaState: "idle",
-      getUserMediaError: null,
-      videoTrackCreated: false,
-      videoTrackReadyState: null,
-      previewStreamHasVideo: false
-    },
-    IMAGE: {
-      selectedVideoDeviceId: null,
-      selectedAudioDeviceId: null,
-      getUserMediaState: "idle",
-      getUserMediaError: null,
-      videoTrackCreated: false,
-      videoTrackReadyState: null,
-      previewStreamHasVideo: false
-    }
-  });
   const [returnPreviewStreams, setReturnPreviewStreams] = useState<Record<ReturnSource, MediaStream | null>>({
     STUDIO: null,
     REGIE: null,
@@ -1012,40 +896,23 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
   const refreshMediaDevices = useCallback(async (requestPermissions: boolean) => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-      console.info("[MSTV Control] mediaDevices unavailable");
       return;
     }
 
     if (requestPermissions) {
       try {
-        console.info("[MSTV Control] Permission getUserMedia requesting");
         const permissionStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true
         });
 
-        console.info("[MSTV Control] Permission getUserMedia resolved", JSON.stringify({
-          videoTrackCount: permissionStream.getVideoTracks().length,
-          audioTrackCount: permissionStream.getAudioTracks().length
-        }));
         permissionStream.getTracks().forEach((track) => track.stop());
       } catch (permissionError) {
-        console.info("[MSTV Control] Permission getUserMedia failed", JSON.stringify({
-          name: permissionError instanceof DOMException ? permissionError.name : permissionError instanceof Error ? permissionError.name : null,
-          message: permissionError instanceof Error ? permissionError.message : String(permissionError)
-        }));
         throw permissionError;
       }
     }
 
     const devices = await navigator.mediaDevices.enumerateDevices();
-    console.info("[MSTV Control] enumerateDevices result", JSON.stringify({
-      total: devices.length,
-      videoInputs: devices.filter((device) => device.kind === "videoinput").length,
-      audioInputs: devices.filter((device) => device.kind === "audioinput").length,
-      audioOutputs: devices.filter((device) => device.kind === "audiooutput").length,
-      labeledDevices: devices.filter((device) => Boolean(device.label)).length
-    }));
     const nextVideoInputs = devices
       .filter((device) => device.kind === "videoinput")
       .map((device, index) => ({
@@ -1653,19 +1520,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const updateReturnFeedPublisherState = useCallback(
     (source: ReturnSource, state: Partial<ReturnFeedPublisherState>) => {
       setReturnFeedPublisherStates((current) => ({
-        ...current,
-        [source]: {
-          ...current[source],
-          ...state
-        }
-      }));
-    },
-    []
-  );
-
-  const updateReturnFeedDebugState = useCallback(
-    (source: ReturnSource, state: Partial<ReturnFeedPublisherDebugState>) => {
-      setReturnFeedDebugStates((current) => ({
         ...current,
         [source]: {
           ...current[source],
@@ -2622,7 +2476,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               audioInputs={audioInputs}
               selectedVideoInputId={null}
               selectedAudioInputId={null}
-              imageFileName={studioInputs.IMAGE.imageFileName ?? null}
               onSelectVideoInput={() => undefined}
               onSelectAudioInput={() => undefined}
               onSelectImageFile={(file) => {
@@ -2675,7 +2528,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           }
           onStateChange={(state) => updateReturnFeedPublisherState("STUDIO", state)}
           onPreviewStreamChange={(stream) => updateReturnPreviewStream("STUDIO", stream)}
-          onDebugStateChange={(state) => updateReturnFeedDebugState("STUDIO", state)}
         />
         <ControlReturnFeedPublisher
           session={returnFeedSessions.REGIE}
@@ -2687,7 +2539,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           }
           onStateChange={(state) => updateReturnFeedPublisherState("REGIE", state)}
           onPreviewStreamChange={(stream) => updateReturnPreviewStream("REGIE", stream)}
-          onDebugStateChange={(state) => updateReturnFeedDebugState("REGIE", state)}
         />
         <ControlReturnFeedPublisher
           session={returnFeedSessions.IMAGE}
@@ -2697,7 +2548,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           enabled={returnInputsEnabled && Boolean(studioInputs.IMAGE.imageDataUrl)}
           onStateChange={(state) => updateReturnFeedPublisherState("IMAGE", state)}
           onPreviewStreamChange={(stream) => updateReturnPreviewStream("IMAGE", stream)}
-          onDebugStateChange={(state) => updateReturnFeedDebugState("IMAGE", state)}
         />
       </div>
       </div>
