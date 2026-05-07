@@ -1957,7 +1957,6 @@ function ControlGuestGridContent({
   const [activeChatGuestId, setActiveChatGuestId] = useState<string | null>(null);
   const [chatDrafts, setChatDrafts] = useState<Record<string, string>>({});
   const [chatMessagesByGuest, setChatMessagesByGuest] = useState<Record<string, PrivateChatMessage[]>>({});
-  const [unreadChatByGuest, setUnreadChatByGuest] = useState<Record<string, number>>({});
   const videoTracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }]);
   const audioTracks = useTracks([{ source: Track.Source.Microphone, withPlaceholder: false }]);
   const concreteVideoTracks = videoTracks.filter(
@@ -1998,12 +1997,6 @@ function ControlGuestGridContent({
   );
   const lastReportedPresentGuestsRef = useRef<string | null>(null);
   const lastReportedLiveGuestsRef = useRef<string | null>(null);
-  const activeChatGuestIdRef = useRef<string | null>(activeChatGuestId);
-
-  useEffect(() => {
-    activeChatGuestIdRef.current = activeChatGuestId;
-  }, [activeChatGuestId]);
-
   function appendPrivateChatMessage(guestId: string, message: PrivateChatMessage) {
     setChatMessagesByGuest((current) => {
       const existingMessages = current[guestId] ?? [];
@@ -2021,10 +2014,6 @@ function ControlGuestGridContent({
 
   function handleOpenGuestChat(guestId: string) {
     setActiveChatGuestId((current) => (current === guestId ? null : guestId));
-    setUnreadChatByGuest((current) => ({
-      ...current,
-      [guestId]: 0
-    }));
   }
 
   function handleSendControlChatMessage(guestId: string, guestName: string) {
@@ -2140,13 +2129,7 @@ function ControlGuestGridContent({
         };
 
         appendPrivateChatMessage(guestId, normalizedMessage);
-
-        if (activeChatGuestIdRef.current !== guestId) {
-          setUnreadChatByGuest((current) => ({
-            ...current,
-            [guestId]: (current[guestId] ?? 0) + 1
-          }));
-        }
+        setActiveChatGuestId(guestId);
       } catch {
         // Ignore unrelated or malformed data messages.
       }
@@ -2204,7 +2187,6 @@ function ControlGuestGridContent({
               : undefined;
         const audibleAudioTrack = audibleAudioTrackRef ? getMediaStreamTrack(audibleAudioTrackRef) : null;
         const chatMessages = chatMessagesByGuest[guest.participantId] ?? [];
-        const unreadChatCount = unreadChatByGuest[guest.participantId] ?? 0;
         const chatIsOpen = activeChatGuestId === guest.participantId;
         const selectionLimitReached = !guest.inProgram && guests.filter((item) => item.inProgram).length >= 3;
         const activeActionPillClassName =
@@ -2379,7 +2361,7 @@ function ControlGuestGridContent({
                       className={`${pillBaseClassName} border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition hover:bg-slate-500`}
                       onClick={() => setActiveChatGuestId(null)}
                     >
-                      Retour
+                      Réduire
                     </button>
                   </div>
                   <ControlChatMessageList messages={chatMessages} />
@@ -2456,17 +2438,12 @@ function ControlGuestGridContent({
                           handleOpenGuestChat(guest.participantId);
                         }}
                         className={`${pillBaseClassName} relative transition ${
-                          chatIsOpen || unreadChatCount > 0
+                          chatIsOpen
                             ? activeActionPillClassName
                             : neutralPillClassName
                         }`}
                       >
                         Chat
-                        {unreadChatCount > 0 ? (
-                          <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d4301f] px-1.5 text-[10px] font-bold leading-none text-white shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
-                            {unreadChatCount}
-                          </span>
-                        ) : null}
                       </button>
                       <button
                         type="button"
