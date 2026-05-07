@@ -120,6 +120,73 @@ interface SlideReceiverStatus {
   message: string;
 }
 
+const studioInputSettingsStorageKey = "mstv.studioInputs";
+
+function getDefaultStudioInputs(): Record<ReturnSource, StudioInputConfig> {
+  return {
+    STUDIO: {
+      id: "STUDIO",
+      label: "STUDIO",
+      videoDeviceId: null,
+      audioDeviceId: null
+    },
+    REGIE: {
+      id: "REGIE",
+      label: "REGIE",
+      videoDeviceId: null,
+      audioDeviceId: null
+    },
+    IMAGE: {
+      id: "IMAGE",
+      label: "IMAGE",
+      videoDeviceId: null,
+      audioDeviceId: null,
+      imageDataUrl: null,
+      imageFileName: null
+    }
+  };
+}
+
+function normalizeStoredStudioInputs(input: unknown): Record<ReturnSource, StudioInputConfig> {
+  const defaults = getDefaultStudioInputs();
+  const parsedInput =
+    input && typeof input === "object"
+      ? (input as Partial<Record<ReturnSource, Partial<StudioInputConfig>>>)
+      : {};
+
+  return {
+    STUDIO: {
+      ...defaults.STUDIO,
+      videoDeviceId: parsedInput.STUDIO?.videoDeviceId ?? null,
+      audioDeviceId: parsedInput.STUDIO?.audioDeviceId ?? null
+    },
+    REGIE: {
+      ...defaults.REGIE,
+      videoDeviceId: parsedInput.REGIE?.videoDeviceId ?? null,
+      audioDeviceId: parsedInput.REGIE?.audioDeviceId ?? null
+    },
+    IMAGE: {
+      ...defaults.IMAGE,
+      imageDataUrl: parsedInput.IMAGE?.imageDataUrl ?? null,
+      imageFileName: parsedInput.IMAGE?.imageFileName ?? null
+    }
+  };
+}
+
+function loadStoredStudioInputs(): Record<ReturnSource, StudioInputConfig> {
+  if (typeof window === "undefined") {
+    return getDefaultStudioInputs();
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(studioInputSettingsStorageKey);
+
+    return normalizeStoredStudioInputs(rawValue ? JSON.parse(rawValue) : null);
+  } catch {
+    return getDefaultStudioInputs();
+  }
+}
+
 function useStudioInputPreview(videoDeviceId: string | null, enabled: boolean) {
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -243,6 +310,10 @@ function StudioInputTile(input: {
   const hasPreviewTrack = (input.previewStream?.getVideoTracks().length ?? 0) > 0;
   const hasPreviewVideo = hasPreviewTrack && previewVideoReady;
   const isImageTile = input.label === "IMAGE";
+  const selectedVideoInputUnavailable = Boolean(
+    input.selectedVideoInputId &&
+      !input.videoInputs.some((device) => device.deviceId === input.selectedVideoInputId)
+  );
 
   useEffect(() => {
     const element = videoRef.current;
@@ -389,6 +460,8 @@ function StudioInputTile(input: {
                   ? "No image selected."
                   : !input.inputsEnabled
                   ? "Select a studio input to start preview."
+                : selectedVideoInputUnavailable
+                  ? "Selected video input unavailable."
                 : input.selectedVideoInputId
                   ? "Opening selected video input..."
                   : "No video input selected."}
@@ -463,6 +536,9 @@ function StudioInputTile(input: {
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 >
                   <option value="">No video</option>
+                  {selectedVideoInputUnavailable ? (
+                    <option value={input.selectedVideoInputId ?? ""}>Saved video unavailable</option>
+                  ) : null}
                   {input.videoInputs.map((device) => (
                     <option key={device.deviceId} value={device.deviceId}>
                       {device.label}
@@ -490,6 +566,10 @@ function StudioInputTile(input: {
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 >
                   <option value="">No audio</option>
+                  {input.selectedAudioInputId &&
+                  !input.audioInputs.some((device) => device.deviceId === input.selectedAudioInputId) ? (
+                    <option value={input.selectedAudioInputId}>Saved audio unavailable</option>
+                  ) : null}
                   {input.audioInputs.map((device) => (
                     <option key={device.deviceId} value={device.deviceId}>
                       {device.label}
@@ -822,28 +902,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [audioInputs, setAudioInputs] = useState<MediaDeviceOption[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<MediaDeviceOption[]>([]);
   const [programAudioOutputDeviceId, setProgramAudioOutputDeviceId] = useState("");
-  const [studioInputs, setStudioInputs] = useState<Record<ReturnSource, StudioInputConfig>>({
-    STUDIO: {
-      id: "STUDIO",
-      label: "STUDIO",
-      videoDeviceId: null,
-      audioDeviceId: null
-    },
-    REGIE: {
-      id: "REGIE",
-      label: "REGIE",
-      videoDeviceId: null,
-      audioDeviceId: null
-    },
-    IMAGE: {
-      id: "IMAGE",
-      label: "IMAGE",
-      videoDeviceId: null,
-      audioDeviceId: null,
-      imageDataUrl: null,
-      imageFileName: null
-    }
-  });
+  const [studioInputs, setStudioInputs] =
+    useState<Record<ReturnSource, StudioInputConfig>>(loadStoredStudioInputs);
   const [returnInputsEnabled, setReturnInputsEnabled] = useState(false);
   const [presentGuestIds, setPresentGuestIds] = useState<string[] | null>(null);
   const [liveGuestStates, setLiveGuestStates] = useState<RuntimeParticipantState[]>([]);
@@ -976,37 +1036,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     setProgramAudioOutputDeviceId((current) =>
       current && nextAudioOutputs.some((device) => device.deviceId === current) ? current : ""
     );
-    setStudioInputs((current) => ({
-      STUDIO: {
-        ...current.STUDIO,
-        videoDeviceId:
-          current.STUDIO.videoDeviceId &&
-          nextVideoInputs.some((device) => device.deviceId === current.STUDIO.videoDeviceId)
-            ? current.STUDIO.videoDeviceId
-            : nextVideoInputs[0]?.deviceId ?? null,
-        audioDeviceId:
-          current.STUDIO.audioDeviceId &&
-          nextAudioInputs.some((device) => device.deviceId === current.STUDIO.audioDeviceId)
-            ? current.STUDIO.audioDeviceId
-            : nextAudioInputs[0]?.deviceId ?? null
-      },
-      REGIE: {
-        ...current.REGIE,
-        videoDeviceId:
-          current.REGIE.videoDeviceId &&
-          nextVideoInputs.some((device) => device.deviceId === current.REGIE.videoDeviceId)
-            ? current.REGIE.videoDeviceId
-            : nextVideoInputs[1]?.deviceId ?? null,
-        audioDeviceId:
-          current.REGIE.audioDeviceId &&
-          nextAudioInputs.some((device) => device.deviceId === current.REGIE.audioDeviceId)
-            ? current.REGIE.audioDeviceId
-            : nextAudioInputs[1]?.deviceId ?? null
-      },
-      IMAGE: {
-        ...current.IMAGE
-      }
-    }));
   }, []);
 
   useEffect(() => {
@@ -1232,6 +1261,23 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   useEffect(() => {
     window.localStorage.setItem("mstv.programAudioOutputDeviceId", programAudioOutputDeviceId);
   }, [programAudioOutputDeviceId]);
+
+  useEffect(() => {
+    window.localStorage.setItem(studioInputSettingsStorageKey, JSON.stringify({
+      STUDIO: {
+        videoDeviceId: studioInputs.STUDIO.videoDeviceId,
+        audioDeviceId: studioInputs.STUDIO.audioDeviceId
+      },
+      REGIE: {
+        videoDeviceId: studioInputs.REGIE.videoDeviceId,
+        audioDeviceId: studioInputs.REGIE.audioDeviceId
+      },
+      IMAGE: {
+        imageDataUrl: studioInputs.IMAGE.imageDataUrl ?? null,
+        imageFileName: studioInputs.IMAGE.imageFileName ?? null
+      }
+    }));
+  }, [studioInputs]);
 
   useEffect(() => {
     if (!slideReceiverHost.trim()) {
