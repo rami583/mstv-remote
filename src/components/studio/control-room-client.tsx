@@ -387,17 +387,15 @@ function StudioInputTile(input: {
         >
           {isImageTile ? (
             <label
-              className="mstv-ui-field w-full cursor-pointer gap-3 border border-white/10 bg-black/80"
+              className="mstv-ui-field relative w-full cursor-pointer gap-3 overflow-hidden border border-white/10 bg-black/80"
               onClick={(event) => event.stopPropagation()}
             >
               <span className="mstv-ui-label">Image</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-white">
-                {input.imageFileName ?? "Select image"}
-              </span>
+              <span className="ml-auto text-sm font-semibold text-white" aria-hidden="true">▾</span>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
-                className="hidden"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 onClick={(event) => event.stopPropagation()}
                 onChange={(event) => {
                   event.stopPropagation();
@@ -413,18 +411,20 @@ function StudioInputTile(input: {
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               <label
-                className="mstv-ui-field gap-3 border border-white/10 bg-black/80"
+                className="mstv-ui-field relative gap-3 overflow-hidden border border-white/10 bg-black/80"
                 onClick={(event) => event.stopPropagation()}
               >
                 <span className="mstv-ui-label">Video Input</span>
+                <span className="ml-auto text-sm font-semibold text-white" aria-hidden="true">▾</span>
                 <select
                   value={input.selectedVideoInputId ?? ""}
+                  aria-label="Video Input"
                   onClick={(event) => event.stopPropagation()}
                   onChange={(event) => {
                     event.stopPropagation();
                     input.onSelectVideoInput(event.target.value || null);
                   }}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 >
                   <option value="">No video</option>
                   {input.videoInputs.map((device) => (
@@ -436,18 +436,20 @@ function StudioInputTile(input: {
               </label>
 
               <label
-                className="mstv-ui-field gap-3 border border-white/10 bg-black/80"
+                className="mstv-ui-field relative gap-3 overflow-hidden border border-white/10 bg-black/80"
                 onClick={(event) => event.stopPropagation()}
               >
                 <span className="mstv-ui-label">Audio Input</span>
+                <span className="ml-auto text-sm font-semibold text-white" aria-hidden="true">▾</span>
                 <select
                   value={input.selectedAudioInputId ?? ""}
+                  aria-label="Audio Input"
                   onClick={(event) => event.stopPropagation()}
                   onChange={(event) => {
                     event.stopPropagation();
                     input.onSelectAudioInput(event.target.value || null);
                   }}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 >
                   <option value="">No audio</option>
                   {input.audioInputs.map((device) => (
