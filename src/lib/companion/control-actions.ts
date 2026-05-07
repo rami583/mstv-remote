@@ -11,6 +11,9 @@ export type CompanionControlAction =
     }
   | {
       action: "unmuteAllProgramGuests";
+    }
+  | {
+      action: "toggleMuteAllProgramGuests";
     };
 
 export interface CompanionControlCommand {

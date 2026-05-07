@@ -2144,6 +2144,14 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       case "unmuteAllProgramGuests":
         setProgramMutedGuestIds([]);
         return;
+      case "toggleMuteAllProgramGuests": {
+        const allProgramGuestsMuted =
+          programGuestIds.length > 0 &&
+          programGuestIds.every((guestId) => programMutedGuestIds.includes(guestId));
+
+        setProgramMutedGuestIds(allProgramGuestsMuted ? [] : programGuestIds);
+        return;
+      }
     }
   }
 

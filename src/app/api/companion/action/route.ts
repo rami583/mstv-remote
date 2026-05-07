@@ -27,6 +27,11 @@ const unmuteAllProgramGuestsActionSchema = z.object({
   room: z.string().trim().min(1).max(120).optional()
 });
 
+const toggleMuteAllProgramGuestsActionSchema = z.object({
+  action: z.literal("toggleMuteAllProgramGuests"),
+  room: z.string().trim().min(1).max(120).optional()
+});
+
 const acknowledgeActionSchema = z.object({
   action: z.literal("acknowledge"),
   commandId: z.string().trim().min(1).max(180)
@@ -37,6 +42,7 @@ const companionActionSchema = z.union([
   togglePipActionSchema,
   muteAllProgramGuestsActionSchema,
   unmuteAllProgramGuestsActionSchema,
+  toggleMuteAllProgramGuestsActionSchema,
   acknowledgeActionSchema
 ]);
 
