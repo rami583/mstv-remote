@@ -1580,6 +1580,9 @@ export function ControlReturnFeedPublisher({
   const publishedVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const publishedAudioTrackRef = useRef<MediaStreamTrack | null>(null);
   const imageRefreshIntervalRef = useRef<number | null>(null);
+  const selectedVideoSourceRef = useRef<string | null>(null);
+  const selectedAudioDeviceIdRef = useRef<string | null>(null);
+  const syncRequestIdRef = useRef(0);
   const onStateChangeRef = useRef(onStateChange);
   const onPreviewStreamChangeRef = useRef(onPreviewStreamChange);
   const onDebugStateChangeRef = useRef(onDebugStateChange);
@@ -1684,6 +1687,8 @@ export function ControlReturnFeedPublisher({
       }
       publishedVideoTrackRef.current = null;
       publishedAudioTrackRef.current = null;
+      selectedVideoSourceRef.current = null;
+      selectedAudioDeviceIdRef.current = null;
       streamRef.current = null;
       onPreviewStreamChangeRef.current?.(null);
       room.off(RoomEvent.ConnectionStateChanged, handleConnectionStateChange);
@@ -1694,22 +1699,96 @@ export function ControlReturnFeedPublisher({
   useEffect(() => {
     let cancelled = false;
 
-    async function clearPublishedTracks() {
+    async function unpublishVideoTrack(room: Room | null, reason: string) {
+      const previousVideoTrack = publishedVideoTrackRef.current;
+
+      if (!previousVideoTrack) {
+        return;
+      }
+
+      console.info("[MSTV Return Publisher] unpublish video", JSON.stringify({
+        sourceLabel: session?.displayName ?? null,
+        reason,
+        trackId: previousVideoTrack.id,
+        readyState: previousVideoTrack.readyState
+      }));
+
+      if (room) {
+        await room.localParticipant.unpublishTrack(previousVideoTrack, false);
+      }
+
+      previousVideoTrack.stop();
+      publishedVideoTrackRef.current = null;
+      selectedVideoSourceRef.current = null;
+    }
+
+    async function unpublishAudioTrack(room: Room | null, reason: string) {
+      const previousAudioTrack = publishedAudioTrackRef.current;
+
+      if (!previousAudioTrack) {
+        return;
+      }
+
+      console.info("[MSTV Return Publisher] unpublish audio", JSON.stringify({
+        sourceLabel: session?.displayName ?? null,
+        reason,
+        trackId: previousAudioTrack.id,
+        readyState: previousAudioTrack.readyState
+      }));
+
+      if (room) {
+        await room.localParticipant.unpublishTrack(previousAudioTrack, false);
+      }
+
+      previousAudioTrack.stop();
+      publishedAudioTrackRef.current = null;
+      selectedAudioDeviceIdRef.current = null;
+    }
+
+    function stopImageRefreshInterval() {
+      if (imageRefreshIntervalRef.current === null) {
+        return;
+      }
+
+      window.clearInterval(imageRefreshIntervalRef.current);
+      imageRefreshIntervalRef.current = null;
+    }
+
+    function publishPreviewState(reason: string) {
+      const previewTracks = [publishedVideoTrackRef.current, publishedAudioTrackRef.current].filter(
+        (track): track is MediaStreamTrack => track !== null && track.readyState === "live"
+      );
+      const previewStream = previewTracks.length > 0 ? new MediaStream(previewTracks) : null;
+      streamRef.current = previewStream;
+
+      console.info("[MSTV Return Publisher] preview stream updated", JSON.stringify({
+        sourceLabel: session?.displayName ?? null,
+        reason,
+        streamId: previewStream?.id ?? null,
+        videoTrackIds: previewStream?.getVideoTracks().map((track) => track.id) ?? [],
+        audioTrackIds: previewStream?.getAudioTracks().map((track) => track.id) ?? [],
+        videoReadyStates: previewStream?.getVideoTracks().map((track) => track.readyState) ?? [],
+        audioReadyStates: previewStream?.getAudioTracks().map((track) => track.readyState) ?? []
+      }));
+
+      onPreviewStreamChangeRef.current?.(previewStream);
+      onDebugStateChangeRef.current?.({
+        videoTrackCreated: Boolean(publishedVideoTrackRef.current),
+        videoTrackReadyState: publishedVideoTrackRef.current?.readyState ?? null,
+        previewStreamHasVideo: (previewStream?.getVideoTracks().length ?? 0) > 0
+      });
+      onStateChangeRef.current?.({
+        videoActive: Boolean(publishedVideoTrackRef.current),
+        audioActive: Boolean(publishedAudioTrackRef.current)
+      });
+    }
+
+    async function clearPublishedTracks(reason: string) {
       const room = publisherRoomRef.current;
 
-      if (room && publishedVideoTrackRef.current) {
-        await room.localParticipant.unpublishTrack(publishedVideoTrackRef.current, false);
-      }
-
-      if (room && publishedAudioTrackRef.current) {
-        await room.localParticipant.unpublishTrack(publishedAudioTrackRef.current, false);
-      }
-
-      publishedVideoTrackRef.current?.stop();
-      publishedAudioTrackRef.current?.stop();
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      publishedVideoTrackRef.current = null;
-      publishedAudioTrackRef.current = null;
+      await unpublishVideoTrack(room, reason);
+      await unpublishAudioTrack(room, reason);
+      stopImageRefreshInterval();
       streamRef.current = null;
       onPreviewStreamChangeRef.current?.(null);
       onDebugStateChangeRef.current?.({
@@ -1721,6 +1800,7 @@ export function ControlReturnFeedPublisher({
 
     async function syncSelectedDevices() {
       const activeSession = session;
+      const requestId = ++syncRequestIdRef.current;
 
       if (
         !enabled ||
@@ -1728,7 +1808,7 @@ export function ControlReturnFeedPublisher({
         !publisherRoomRef.current ||
         publisherConnectionState !== "connected"
       ) {
-        await clearPublishedTracks();
+        await clearPublishedTracks("publisher-not-ready");
         onStateChangeRef.current?.({
           videoActive: false,
           audioActive: false,
@@ -1742,7 +1822,7 @@ export function ControlReturnFeedPublisher({
       const hasImage = Boolean(imageDataUrl);
 
       if (!hasVideo && !hasAudio && !hasImage) {
-        await clearPublishedTracks();
+        await clearPublishedTracks("no-selected-source");
         onStateChangeRef.current?.({
           videoActive: false,
           audioActive: false,
@@ -1751,14 +1831,22 @@ export function ControlReturnFeedPublisher({
         return;
       }
 
+      const room = publisherRoomRef.current;
+      const nextVideoSource = hasImage
+        ? `image:${imageDataUrl}`
+        : hasVideo
+          ? `device:${videoDeviceId}`
+          : null;
+      const videoSourceChanged = selectedVideoSourceRef.current !== nextVideoSource;
+      const audioSourceChanged = selectedAudioDeviceIdRef.current !== (hasAudio ? audioDeviceId : null);
+
       onDebugStateChangeRef.current?.({
         getUserMediaState: "requesting",
         getUserMediaError: null
       });
 
-      let nextStream: MediaStream;
-
-      if (hasImage) {
+      if (hasImage && videoSourceChanged) {
+        stopImageRefreshInterval();
         const image = await new Promise<HTMLImageElement>((resolve, reject) => {
           const nextImage = new Image();
           nextImage.onload = () => resolve(nextImage);
@@ -1798,85 +1886,122 @@ export function ControlReturnFeedPublisher({
 
         drawFrame();
         imageRefreshIntervalRef.current = window.setInterval(drawFrame, 1000);
-        nextStream = canvas.captureStream(1);
-      } else {
-        console.info("[MSTV Return Publisher] getUserMedia requesting", JSON.stringify({
+        const nextImageStream = canvas.captureStream(1);
+        const nextImageVideoTrack = nextImageStream.getVideoTracks()[0] ?? null;
+
+        if (cancelled || requestId !== syncRequestIdRef.current || !room) {
+          nextImageStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        await unpublishVideoTrack(room, "image-source-changed");
+
+        if (nextImageVideoTrack) {
+          await room.localParticipant.publishTrack(nextImageVideoTrack, {
+            source: Track.Source.Camera,
+            name: "guest-return-video"
+          });
+          publishedVideoTrackRef.current = nextImageVideoTrack;
+          selectedVideoSourceRef.current = nextVideoSource;
+        }
+      } else if (!hasImage && hasVideo && videoSourceChanged) {
+        console.info("[MSTV Return Publisher] video getUserMedia requesting", JSON.stringify({
           sourceLabel: activeSession.displayName,
           videoDeviceId,
-          audioDeviceId,
-          hasVideo,
-          hasAudio
+          previousVideoTrackId: publishedVideoTrackRef.current?.id ?? null,
+          previousVideoReadyState: publishedVideoTrackRef.current?.readyState ?? null
         }));
-        nextStream = await navigator.mediaDevices.getUserMedia({
+        const nextVideoStream = await navigator.mediaDevices.getUserMedia({
           video: hasVideo ? { deviceId: { exact: videoDeviceId ?? undefined } } : false,
-          audio: hasAudio ? { deviceId: { exact: audioDeviceId ?? undefined } } : false
+          audio: false
         });
-        console.info("[MSTV Return Publisher] getUserMedia resolved", JSON.stringify({
+        const nextVideoTrack = nextVideoStream.getVideoTracks()[0] ?? null;
+        console.info("[MSTV Return Publisher] video getUserMedia resolved", JSON.stringify({
           sourceLabel: activeSession.displayName,
-          videoTracks: nextStream.getVideoTracks().map((track) => ({
-            label: track.label,
-            readyState: track.readyState,
-            muted: track.muted
-          })),
-          audioTracks: nextStream.getAudioTracks().map((track) => ({
+          streamId: nextVideoStream.id,
+          videoTracks: nextVideoStream.getVideoTracks().map((track) => ({
+            id: track.id,
             label: track.label,
             readyState: track.readyState,
             muted: track.muted
           }))
         }));
+
+        if (cancelled || requestId !== syncRequestIdRef.current || !room) {
+          nextVideoStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        await unpublishVideoTrack(room, "video-source-changed");
+
+        if (nextVideoTrack) {
+          await room.localParticipant.publishTrack(nextVideoTrack, {
+            source: Track.Source.Camera,
+            name: "guest-return-video"
+          });
+          publishedVideoTrackRef.current = nextVideoTrack;
+          selectedVideoSourceRef.current = nextVideoSource;
+        }
+      } else if (!hasImage && !hasVideo && publishedVideoTrackRef.current) {
+        await unpublishVideoTrack(room, "video-disabled");
       }
 
-      if (cancelled) {
-        nextStream.getTracks().forEach((track) => track.stop());
-        return;
+      if (hasImage && publishedAudioTrackRef.current) {
+        await unpublishAudioTrack(room, "image-has-no-audio");
+      } else if (!hasImage && hasAudio && audioSourceChanged) {
+        console.info("[MSTV Return Publisher] audio getUserMedia requesting", JSON.stringify({
+          sourceLabel: activeSession.displayName,
+          audioDeviceId,
+          preservedVideoTrackId: publishedVideoTrackRef.current?.id ?? null,
+          preservedVideoReadyState: publishedVideoTrackRef.current?.readyState ?? null,
+          previousAudioTrackId: publishedAudioTrackRef.current?.id ?? null
+        }));
+        const nextAudioStream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: { deviceId: { exact: audioDeviceId ?? undefined } }
+        });
+        const nextAudioTrack = nextAudioStream.getAudioTracks()[0] ?? null;
+        console.info("[MSTV Return Publisher] audio getUserMedia resolved", JSON.stringify({
+          sourceLabel: activeSession.displayName,
+          streamId: nextAudioStream.id,
+          preservedVideoTrackId: publishedVideoTrackRef.current?.id ?? null,
+          preservedVideoReadyState: publishedVideoTrackRef.current?.readyState ?? null,
+          audioTracks: nextAudioStream.getAudioTracks().map((track) => ({
+            id: track.id,
+            label: track.label,
+            readyState: track.readyState,
+            muted: track.muted
+          }))
+        }));
+
+        if (cancelled || requestId !== syncRequestIdRef.current || !room) {
+          nextAudioStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        await unpublishAudioTrack(room, "audio-source-changed");
+
+        if (nextAudioTrack) {
+          await room.localParticipant.publishTrack(nextAudioTrack, {
+            source: Track.Source.Microphone,
+            name: "guest-return-audio"
+          });
+          publishedAudioTrackRef.current = nextAudioTrack;
+          selectedAudioDeviceIdRef.current = audioDeviceId;
+        }
+      } else if (!hasImage && !hasAudio && publishedAudioTrackRef.current) {
+        await unpublishAudioTrack(room, "audio-disabled");
       }
 
-      const room = publisherRoomRef.current;
+      publishPreviewState(videoSourceChanged ? "video-source-sync" : audioSourceChanged ? "audio-source-sync" : "source-state-sync");
 
-      if (!room) {
-        nextStream.getTracks().forEach((track) => track.stop());
-        return;
-      }
-
-      const nextVideoTrack = nextStream.getVideoTracks()[0] ?? null;
-      const nextAudioTrack = nextStream.getAudioTracks()[0] ?? null;
-
-      await clearPublishedTracks();
-
-      streamRef.current = nextStream;
-      const previewTracks = [nextVideoTrack, nextAudioTrack].filter(
-        (track): track is MediaStreamTrack => track !== null
-      );
-      const previewStream = previewTracks.length > 0 ? new MediaStream(previewTracks) : null;
-
-      onPreviewStreamChangeRef.current?.(previewStream);
       onDebugStateChangeRef.current?.({
         getUserMediaState: "resolved",
-        getUserMediaError: null,
-        videoTrackCreated: Boolean(nextVideoTrack),
-        videoTrackReadyState: nextVideoTrack?.readyState ?? null,
-        previewStreamHasVideo: (previewStream?.getVideoTracks().length ?? 0) > 0
+        getUserMediaError: null
       });
-
-      if (nextVideoTrack) {
-        await room.localParticipant.publishTrack(nextVideoTrack, {
-          source: Track.Source.Camera,
-          name: "guest-return-video"
-        });
-        publishedVideoTrackRef.current = nextVideoTrack;
-      }
-
-      if (nextAudioTrack) {
-        await room.localParticipant.publishTrack(nextAudioTrack, {
-          source: Track.Source.Microphone,
-          name: "guest-return-audio"
-        });
-        publishedAudioTrackRef.current = nextAudioTrack;
-      }
-
       onStateChangeRef.current?.({
-        videoActive: Boolean(nextVideoTrack),
-        audioActive: Boolean(nextAudioTrack),
+        videoActive: Boolean(publishedVideoTrackRef.current),
+        audioActive: Boolean(publishedAudioTrackRef.current),
         error: null
       });
     }
@@ -1889,13 +2014,13 @@ export function ControlReturnFeedPublisher({
       onDebugStateChangeRef.current?.({
         getUserMediaState: "failed",
         getUserMediaError: getMediaCaptureErrorMessage(error),
-        videoTrackCreated: false,
-        videoTrackReadyState: null,
-        previewStreamHasVideo: false
+        videoTrackCreated: Boolean(publishedVideoTrackRef.current),
+        videoTrackReadyState: publishedVideoTrackRef.current?.readyState ?? null,
+        previewStreamHasVideo: Boolean(publishedVideoTrackRef.current)
       });
       onStateChangeRef.current?.({
-        videoActive: false,
-        audioActive: false,
+        videoActive: Boolean(publishedVideoTrackRef.current),
+        audioActive: Boolean(publishedAudioTrackRef.current),
         error: getMediaCaptureErrorMessage(error)
       });
       console.info("[MSTV Return Publisher] getUserMedia failed", JSON.stringify({
@@ -1909,7 +2034,6 @@ export function ControlReturnFeedPublisher({
 
     return () => {
       cancelled = true;
-      void clearPublishedTracks().catch(() => undefined);
     };
   }, [audioDeviceId, enabled, imageDataUrl, publisherConnectionState, session, videoDeviceId]);
 

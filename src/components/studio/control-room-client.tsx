@@ -237,6 +237,7 @@ function StudioInputTile(input: {
   onSelectImageFile?: (file: File | null) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const previewVideoTrackIdRef = useRef<string | null>(null);
   const [previewVideoReady, setPreviewVideoReady] = useState(false);
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const hasPreviewTrack = (input.previewStream?.getVideoTracks().length ?? 0) > 0;
@@ -245,10 +246,15 @@ function StudioInputTile(input: {
 
   useEffect(() => {
     const element = videoRef.current;
+    const nextVideoTrackId = input.previewStream?.getVideoTracks()[0]?.id ?? null;
+    const videoTrackChanged = previewVideoTrackIdRef.current !== nextVideoTrackId;
 
-    setPreviewVideoReady(false);
+    if (videoTrackChanged) {
+      setPreviewVideoReady(false);
+    }
 
     if (!element) {
+      previewVideoTrackIdRef.current = nextVideoTrackId;
       return;
     }
 
@@ -258,12 +264,24 @@ function StudioInputTile(input: {
       }
     };
 
+    console.info("[MSTV Control] Studio input preview srcObject assignment", JSON.stringify({
+      label: input.label,
+      streamId: input.previewStream?.id ?? null,
+      nextVideoTrackId,
+      previousVideoTrackId: previewVideoTrackIdRef.current,
+      videoTrackChanged,
+      currentVideoWidth: element.videoWidth,
+      currentVideoHeight: element.videoHeight
+    }));
+
     element.srcObject = input.previewStream;
+    previewVideoTrackIdRef.current = nextVideoTrackId;
 
     if (input.previewStream) {
       element.load();
       element.addEventListener("loadedmetadata", markReady);
       element.addEventListener("resize", markReady);
+      markReady();
       void element.play().catch(() => undefined);
     }
 
