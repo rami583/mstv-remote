@@ -121,6 +121,34 @@ interface SlideReceiverStatus {
 }
 
 const studioInputSettingsStorageKey = "mstv.studioInputs";
+const programDisplayStorageKey = "mstv.programDisplayId";
+const programAudioOutputStorageKey = "mstv.programAudioOutputDeviceId";
+const slideReceiverHostStorageKey = "mstv.slideReceiverHost";
+const slideReceiverPortStorageKey = "mstv.slideReceiverPort";
+
+function loadStoredString(key: string, fallback = "") {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const value = window.localStorage.getItem(key);
+    return value?.trim() ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function loadStoredProgramDisplayId() {
+  const savedValue = loadStoredString(programDisplayStorageKey);
+
+  if (!savedValue) {
+    return null;
+  }
+
+  const parsedValue = Number(savedValue);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
 
 function getDefaultStudioInputs(): Record<ReturnSource, StudioInputConfig> {
   return {
@@ -901,7 +929,9 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [videoInputs, setVideoInputs] = useState<MediaDeviceOption[]>([]);
   const [audioInputs, setAudioInputs] = useState<MediaDeviceOption[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<MediaDeviceOption[]>([]);
-  const [programAudioOutputDeviceId, setProgramAudioOutputDeviceId] = useState("");
+  const [programAudioOutputDeviceId, setProgramAudioOutputDeviceId] = useState(() =>
+    loadStoredString(programAudioOutputStorageKey)
+  );
   const [studioInputs, setStudioInputs] =
     useState<Record<ReturnSource, StudioInputConfig>>(loadStoredStudioInputs);
   const [returnInputsEnabled, setReturnInputsEnabled] = useState(false);
@@ -953,14 +983,19 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [desktopConfig, setDesktopConfig] = useState<DesktopRuntimeConfig | null>(null);
   const [isDesktopRuntime, setIsDesktopRuntime] = useState(false);
   const [programDisplays, setProgramDisplays] = useState<DesktopProgramDisplay[]>([]);
-  const [selectedProgramDisplayId, setSelectedProgramDisplayId] = useState<number | null>(null);
+  const [selectedProgramDisplayId, setSelectedProgramDisplayId] = useState<number | null>(
+    loadStoredProgramDisplayId
+  );
   const [isProgramWindowOpen, setIsProgramWindowOpen] = useState(false);
   const [guestLinkCopied, setGuestLinkCopied] = useState(false);
   const [sessionSlugDraft, setSessionSlugDraft] = useState(room || "studio");
   const [isApplyingSessionSlug, setIsApplyingSessionSlug] = useState(false);
-  const [slideReceiverHost, setSlideReceiverHost] = useState(defaultSlideReceiverHost);
-  const [slideReceiverPort, setSlideReceiverPort] = useState(defaultSlideReceiverPort);
-  const [slideReceiverSettingsLoaded, setSlideReceiverSettingsLoaded] = useState(false);
+  const [slideReceiverHost, setSlideReceiverHost] = useState(() =>
+    loadStoredString(slideReceiverHostStorageKey, defaultSlideReceiverHost)
+  );
+  const [slideReceiverPort, setSlideReceiverPort] = useState(() =>
+    loadStoredString(slideReceiverPortStorageKey, defaultSlideReceiverPort)
+  );
   const [slideReceiverStatus, setSlideReceiverStatus] = useState<SlideReceiverStatus>({
     state: "idle",
     message: "Receiver non configuré"
@@ -1033,9 +1068,6 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     setVideoInputs(nextVideoInputs);
     setAudioInputs(nextAudioInputs);
     setAudioOutputs(nextAudioOutputs);
-    setProgramAudioOutputDeviceId((current) =>
-      current && nextAudioOutputs.some((device) => device.deviceId === current) ? current : ""
-    );
   }, []);
 
   useEffect(() => {
@@ -1189,35 +1221,12 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }, []);
 
   useEffect(() => {
-    const savedHost = window.localStorage.getItem("mstv.slideReceiverHost");
-    const savedPort = window.localStorage.getItem("mstv.slideReceiverPort");
-    const savedProgramAudioOutput = window.localStorage.getItem("mstv.programAudioOutputDeviceId");
-
-    setSlideReceiverHost(savedHost?.trim() ? savedHost : defaultSlideReceiverHost);
-    setSlideReceiverPort(savedPort?.trim() ? savedPort : defaultSlideReceiverPort);
-
-    if (savedProgramAudioOutput) {
-      setProgramAudioOutputDeviceId(savedProgramAudioOutput);
-    }
-
-    setSlideReceiverSettingsLoaded(true);
-  }, []);
+    window.localStorage.setItem(slideReceiverHostStorageKey, slideReceiverHost);
+  }, [slideReceiverHost]);
 
   useEffect(() => {
-    if (!slideReceiverSettingsLoaded) {
-      return;
-    }
-
-    window.localStorage.setItem("mstv.slideReceiverHost", slideReceiverHost);
-  }, [slideReceiverHost, slideReceiverSettingsLoaded]);
-
-  useEffect(() => {
-    if (!slideReceiverSettingsLoaded) {
-      return;
-    }
-
-    window.localStorage.setItem("mstv.slideReceiverPort", slideReceiverPort);
-  }, [slideReceiverPort, slideReceiverSettingsLoaded]);
+    window.localStorage.setItem(slideReceiverPortStorageKey, slideReceiverPort);
+  }, [slideReceiverPort]);
 
   useEffect(() => {
     if (!programRecordingStatus.startedAt || programRecordingStatus.state !== "recording") {
@@ -1259,8 +1268,17 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }, [programRecordingStatus.filePath, programRecordingStatus.state]);
 
   useEffect(() => {
-    window.localStorage.setItem("mstv.programAudioOutputDeviceId", programAudioOutputDeviceId);
+    window.localStorage.setItem(programAudioOutputStorageKey, programAudioOutputDeviceId);
   }, [programAudioOutputDeviceId]);
+
+  useEffect(() => {
+    if (selectedProgramDisplayId === null) {
+      window.localStorage.removeItem(programDisplayStorageKey);
+      return;
+    }
+
+    window.localStorage.setItem(programDisplayStorageKey, String(selectedProgramDisplayId));
+  }, [selectedProgramDisplayId]);
 
   useEffect(() => {
     window.localStorage.setItem(studioInputSettingsStorageKey, JSON.stringify({
@@ -1332,7 +1350,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         setProgramDisplays(response.displays);
         setIsProgramWindowOpen(response.programWindow.isOpen);
         setSelectedProgramDisplayId((current) => {
-          if (current && response.displays.some((display) => display.id === current)) {
+          if (current !== null) {
             return current;
           }
 
@@ -1564,6 +1582,14 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       ? "erreur"
       : "connecté"
     : "non configuré";
+  const selectedProgramDisplayUnavailable = Boolean(
+    selectedProgramDisplayId !== null &&
+      !programDisplays.some((display) => display.id === selectedProgramDisplayId)
+  );
+  const selectedProgramAudioOutputUnavailable = Boolean(
+    programAudioOutputDeviceId &&
+      !audioOutputs.some((device) => device.deviceId === programAudioOutputDeviceId)
+  );
   const controlTileGridClassName = isDesktopRuntime
     ? "grid grid-cols-3 gap-4"
     : "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))]";
@@ -2225,7 +2251,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       setProgramDisplays(response.displays);
       setIsProgramWindowOpen(response.programWindow.isOpen);
       setSelectedProgramDisplayId((current) => {
-        if (current && response.displays.some((display) => display.id === current)) {
+        if (current !== null) {
           return current;
         }
 
@@ -2353,6 +2379,11 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
                 disabled={isProgramWindowOpen}
                 className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none disabled:opacity-60"
               >
+                {selectedProgramDisplayUnavailable ? (
+                  <option value={selectedProgramDisplayId ?? ""}>
+                    Écran sauvegardé indisponible
+                  </option>
+                ) : null}
                 {programDisplays.map((display) => (
                   <option key={display.id} value={display.id}>
                     {display.label}
@@ -2370,6 +2401,11 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
                 className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
               >
                 <option value="">Sortie système</option>
+                {selectedProgramAudioOutputUnavailable ? (
+                  <option value={programAudioOutputDeviceId}>
+                    Sortie sauvegardée indisponible
+                  </option>
+                ) : null}
                 {audioOutputs.map((device) => (
                   <option key={device.deviceId} value={device.deviceId}>
                     {device.label}
@@ -2455,6 +2491,11 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               className="mstv-ui-field min-w-[260px] border border-white/10 bg-black text-white outline-none"
             >
               <option value="">Sortie système</option>
+              {selectedProgramAudioOutputUnavailable ? (
+                <option value={programAudioOutputDeviceId}>
+                  Sortie sauvegardée indisponible
+                </option>
+              ) : null}
               {audioOutputs.map((device) => (
                 <option key={device.deviceId} value={device.deviceId}>
                   {device.label}

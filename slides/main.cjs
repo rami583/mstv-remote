@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain, shell, systemPreferences } = require("electron");
 const { execFile } = require("node:child_process");
+const fs = require("node:fs");
 const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
@@ -9,6 +10,7 @@ const SERVER_HOST = "0.0.0.0";
 const REMOTE_CONTACT_TIMEOUT_MS = 30_000;
 const DEFAULT_TARGET_APP = "Microsoft PowerPoint";
 const TARGET_APPS = new Set(["Microsoft PowerPoint", "Keynote", "Preview"]);
+const SETTINGS_FILE_NAME = "settings.json";
 
 let mainWindow = null;
 let server = null;
@@ -50,6 +52,49 @@ function configureApplicationMenu() {
       }
     ])
   );
+}
+
+function getSettingsPath() {
+  return path.join(app.getPath("userData"), SETTINGS_FILE_NAME);
+}
+
+function readSettings() {
+  try {
+    const settingsPath = getSettingsPath();
+
+    if (!fs.existsSync(settingsPath)) {
+      return {};
+    }
+
+    const parsedSettings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    return parsedSettings && typeof parsedSettings === "object" ? parsedSettings : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSettings(nextSettings) {
+  const settingsPath = getSettingsPath();
+  const currentSettings = readSettings();
+  const mergedSettings = {
+    ...currentSettings,
+    ...nextSettings
+  };
+
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(mergedSettings, null, 2));
+}
+
+function restoreSavedSettings() {
+  const settings = readSettings();
+  const selectedTargetApp = TARGET_APPS.has(settings.selectedTargetApp)
+    ? settings.selectedTargetApp
+    : DEFAULT_TARGET_APP;
+
+  serverState = {
+    ...serverState,
+    selectedTargetApp
+  };
 }
 
 function isAccessibilityTrusted(prompt = false) {
@@ -97,6 +142,9 @@ function setSelectedTargetApp(value) {
     ...serverState,
     selectedTargetApp: nextTargetApp
   };
+  writeSettings({
+    selectedTargetApp: nextTargetApp
+  });
   emitState();
 
   return nextTargetApp;
@@ -406,6 +454,7 @@ function createWindow() {
 app.name = "MSTV Click";
 
 app.whenReady().then(() => {
+  restoreSavedSettings();
   configureApplicationMenu();
   ipcMain.handle("slides:get-state", () => ({
     ...serverState,
