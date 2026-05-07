@@ -1,4 +1,5 @@
 import type { StudioMessage } from "@/lib/types/messaging";
+import type { CompanionControlCommand } from "@/lib/companion/control-actions";
 import type {
   GuestVideoFraming,
   ProductionParticipantState,
@@ -256,4 +257,37 @@ export async function disconnectGuest(room: string, participantId: string) {
     room: string;
     disconnectedParticipantIds: string[];
   };
+}
+
+export async function fetchPendingCompanionActions(room: string): Promise<CompanionControlCommand[]> {
+  const response = await fetch(`/api/companion/action?room=${encodeURIComponent(room)}`, {
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to load Companion actions.");
+  }
+
+  const payload = (await response.json()) as { commands?: CompanionControlCommand[] };
+
+  return payload.commands ?? [];
+}
+
+export async function acknowledgeCompanionAction(commandId: string) {
+  const response = await fetch("/api/companion/action", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      action: "acknowledge",
+      commandId
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to acknowledge Companion action.");
+  }
+
+  return (await response.json()) as { ok: true; command: CompanionControlCommand };
 }

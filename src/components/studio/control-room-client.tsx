@@ -11,6 +11,7 @@ import {
   type ReturnFeedPublisherState
 } from "@/components/livekit/minimal-studio-surfaces";
 import { AudioLevelMeter } from "@/components/studio/audio-level-meter";
+import type { CompanionControlCommand } from "@/lib/companion/control-actions";
 import { fetchLiveKitToken } from "@/lib/livekit/browser-token";
 import { buildParticipantIdentity } from "@/lib/livekit/identity";
 import {
@@ -19,7 +20,9 @@ import {
   type MediaStatusIndicator
 } from "@/lib/studio/media-status";
 import {
+  acknowledgeCompanionAction,
   fetchProductionSnapshot,
+  fetchPendingCompanionActions,
   disconnectGuest,
   updateGuestVideoFraming,
   updateGlobalReturnSource,
@@ -893,6 +896,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   });
   const [programRecordingElapsedMs, setProgramRecordingElapsedMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const companionActionProcessingRef = useRef(false);
 
   const refreshMediaDevices = useCallback(async (requestPermissions: boolean) => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices) {
@@ -2120,6 +2124,67 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       );
     }
   }
+
+  async function executeCompanionAction(command: CompanionControlCommand) {
+    switch (command.action.action) {
+      case "selectGuest": {
+        const guest = guests[command.action.guestIndex - 1];
+
+        if (guest) {
+          await handleToggleGuest(guest.participantId);
+        }
+        return;
+      }
+      case "togglePip":
+        await handleTogglePipMode();
+        return;
+      case "muteAllProgramGuests":
+        setProgramMutedGuestIds(programGuestIds);
+        return;
+      case "unmuteAllProgramGuests":
+        setProgramMutedGuestIds([]);
+        return;
+    }
+  }
+
+  useEffect(() => {
+    let active = true;
+
+    async function pollCompanionActions() {
+      if (companionActionProcessingRef.current) {
+        return;
+      }
+
+      companionActionProcessingRef.current = true;
+
+      try {
+        const commands = await fetchPendingCompanionActions(room);
+
+        for (const command of commands) {
+          if (!active) {
+            return;
+          }
+
+          await executeCompanionAction(command);
+          await acknowledgeCompanionAction(command.id);
+        }
+      } catch {
+        // Companion control must never interrupt live operation.
+      } finally {
+        companionActionProcessingRef.current = false;
+      }
+    }
+
+    void pollCompanionActions();
+    const interval = window.setInterval(() => {
+      void pollCompanionActions();
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [guests, pipModeEnabled, productionSnapshot, programGuestIds, programMutedGuestIds, room]);
 
   return (
     <main
