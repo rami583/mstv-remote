@@ -200,6 +200,23 @@ function isAcceptedImageFile(file: File) {
   return acceptedMimeTypes.has(file.type) || acceptedExtensions.test(file.name);
 }
 
+function SelectorChevronIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    >
+      <path d="M4 6.25 8 10l4-3.75" />
+    </svg>
+  );
+}
+
 function StudioInputTile(input: {
   label: string;
   isActive: boolean;
@@ -387,11 +404,10 @@ function StudioInputTile(input: {
         >
           {isImageTile ? (
             <label
-              className="mstv-ui-field relative w-full cursor-pointer gap-3 overflow-hidden border border-white/10 bg-black/80"
+              className="mstv-ui-field relative inline-flex w-fit cursor-pointer gap-3 overflow-hidden border border-white/10 bg-black/80"
               onClick={(event) => event.stopPropagation()}
             >
               <span className="mstv-ui-label">Image</span>
-              <span className="ml-auto text-sm font-semibold text-white" aria-hidden="true">▾</span>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
@@ -409,13 +425,15 @@ function StudioInputTile(input: {
               />
             </label>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="flex flex-wrap items-center gap-3">
               <label
-                className="mstv-ui-field relative gap-3 overflow-hidden border border-white/10 bg-black/80"
+                className="mstv-ui-field relative inline-flex w-fit gap-3 overflow-hidden border border-white/10 bg-black/80"
                 onClick={(event) => event.stopPropagation()}
               >
                 <span className="mstv-ui-label">Video Input</span>
-                <span className="ml-auto text-sm font-semibold text-white" aria-hidden="true">▾</span>
+                <span className="ml-auto inline-flex items-center justify-center text-slate-300">
+                  <SelectorChevronIcon />
+                </span>
                 <select
                   value={input.selectedVideoInputId ?? ""}
                   aria-label="Video Input"
@@ -436,11 +454,13 @@ function StudioInputTile(input: {
               </label>
 
               <label
-                className="mstv-ui-field relative gap-3 overflow-hidden border border-white/10 bg-black/80"
+                className="mstv-ui-field relative inline-flex w-fit gap-3 overflow-hidden border border-white/10 bg-black/80"
                 onClick={(event) => event.stopPropagation()}
               >
                 <span className="mstv-ui-label">Audio Input</span>
-                <span className="ml-auto text-sm font-semibold text-white" aria-hidden="true">▾</span>
+                <span className="ml-auto inline-flex items-center justify-center text-slate-300">
+                  <SelectorChevronIcon />
+                </span>
                 <select
                   value={input.selectedAudioInputId ?? ""}
                   aria-label="Audio Input"
