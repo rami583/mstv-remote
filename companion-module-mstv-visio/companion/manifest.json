@@ -1,0 +1,26 @@
+{
+  "$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
+  "id": "mstv-visio",
+  "name": "MSTV Visio",
+  "shortname": "MSTV Visio",
+  "description": "Control MSTV Visio Program selection, PIP, and global mute over HTTP.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": "https://example.invalid/companion-module-mstv-visio",
+  "bugs": "https://example.invalid/companion-module-mstv-visio/issues",
+  "maintainers": [
+    {
+      "name": "Mon Studio TV"
+    }
+  ],
+  "runtime": {
+    "type": "node22",
+    "api": "nodejs-ipc",
+    "apiVersion": "0.0.0",
+    "entrypoint": "../src/main.js"
+  },
+  "legacyIds": [],
+  "manufacturer": "Mon Studio TV",
+  "products": ["MSTV Visio"],
+  "keywords": ["MSTV", "Visio", "StreamDeck", "Program", "PIP"]
+}

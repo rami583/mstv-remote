@@ -1,0 +1,23 @@
+{
+  "name": "companion-module-mstv-visio",
+  "version": "0.1.0",
+  "description": "Bitfocus Companion module for MSTV Visio.",
+  "main": "src/main.js",
+  "scripts": {
+    "package": "companion-module-build",
+    "check": "node --check src/main.js"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": "^22.20"
+  },
+  "dependencies": {
+    "@companion-module/base": "~1.14.1"
+  },
+  "devDependencies": {
+    "@companion-module/tools": "^2.6.1",
+    "prettier": "^3.7.4"
+  },
+  "prettier": "@companion-module/tools/.prettierrc.json",
+  "packageManager": "yarn@4.12.0"
+}
