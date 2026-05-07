@@ -2145,11 +2145,17 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
         setProgramMutedGuestIds([]);
         return;
       case "toggleMuteAllProgramGuests": {
-        const allProgramGuestsMuted =
-          programGuestIds.length > 0 &&
-          programGuestIds.every((guestId) => programMutedGuestIds.includes(guestId));
+        const allAudibleGuestIds = [...programGuestIds, ...activeRegieGuestIds];
+        const hasUnmutedProgramGuest = programGuestIds.some(
+          (guestId) => !programMutedGuestIds.includes(guestId)
+        );
+        const hasUnmutedRegieGuest = activeRegieGuestIds.some(
+          (guestId) => !regieMutedGuestIds.includes(guestId)
+        );
+        const shouldMuteAll = allAudibleGuestIds.length > 0 && (hasUnmutedProgramGuest || hasUnmutedRegieGuest);
 
-        setProgramMutedGuestIds(allProgramGuestsMuted ? [] : programGuestIds);
+        setProgramMutedGuestIds(shouldMuteAll ? programGuestIds : []);
+        setRegieMutedGuestIds(shouldMuteAll ? activeRegieGuestIds : []);
         return;
       }
     }
