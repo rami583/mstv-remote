@@ -171,7 +171,6 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
   const [pendingPrivateChatMessage, setPendingPrivateChatMessage] =
     useState<PrivateChatMessage | null>(null);
   const [privateChatOpen, setPrivateChatOpen] = useState(false);
-  const [privateChatUnreadCount, setPrivateChatUnreadCount] = useState(0);
   const [isJoiningLive, setIsJoiningLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastSlideCommandAtRef = useRef(0);
@@ -525,10 +524,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
 
   function handlePrivateChatReceived(message: PrivateChatMessage) {
     appendPrivateChatMessage(message);
-
-    if (!privateChatOpen) {
-      setPrivateChatUnreadCount((count) => count + 1);
-    }
+    setPrivateChatOpen(true);
   }
 
   function handleSendPrivateChatMessage() {
@@ -562,7 +558,6 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
 
   function handleTogglePrivateChat() {
     setPrivateChatOpen((current) => !current);
-    setPrivateChatUnreadCount(0);
   }
 
   const handleProgramGuestIdsChange = useCallback((nextProgramGuestIds: string[]) => {
@@ -871,14 +866,9 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               <button
                 type="button"
                 onClick={handleTogglePrivateChat}
-                className="relative rounded-full border border-transparent bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition hover:bg-sky-400"
+                className="rounded-full border border-transparent bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition hover:bg-sky-400"
               >
                 Chat
-                {privateChatUnreadCount > 0 ? (
-                  <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d4301f] px-1.5 text-[10px] font-bold leading-none text-white shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
-                    {privateChatUnreadCount}
-                  </span>
-                ) : null}
               </button>
             )}
           </div>
