@@ -897,6 +897,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [isProgramWindowOpen, setIsProgramWindowOpen] = useState(false);
   const [guestLinkCopied, setGuestLinkCopied] = useState(false);
   const [sessionSlugDraft, setSessionSlugDraft] = useState(room || "studio");
+  const [isApplyingSessionSlug, setIsApplyingSessionSlug] = useState(false);
   const [slideReceiverHost, setSlideReceiverHost] = useState(defaultSlideReceiverHost);
   const [slideReceiverPort, setSlideReceiverPort] = useState(defaultSlideReceiverPort);
   const [slideReceiverSettingsLoaded, setSlideReceiverSettingsLoaded] = useState(false);
@@ -2116,6 +2117,10 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   }
 
   async function handleApplySessionSlug() {
+    if (isApplyingSessionSlug) {
+      return;
+    }
+
     const nextRoom = sanitizedSessionSlug;
 
     if (
@@ -2127,6 +2132,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
     ) {
       return;
     }
+
+    setIsApplyingSessionSlug(true);
 
     try {
       if (nextRoom !== room && isProgramWindowOpen && window.mstvDesktop) {
@@ -2147,6 +2154,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           ? programWindowError.message
           : "Impossible d’appliquer cette session."
       );
+      setIsApplyingSessionSlug(false);
       return;
     }
 
@@ -2154,7 +2162,10 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
     if (nextRoom !== room) {
       window.location.assign(`/control/${encodeURIComponent(nextRoom)}`);
+      return;
     }
+
+    setIsApplyingSessionSlug(false);
   }
 
   async function handleToggleProgramWindow() {
@@ -2240,29 +2251,35 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-200">
               {guestPublicLink ?? guestPublicLinkWarning}
             </span>
-            <label className="mstv-ui-field min-w-[260px] gap-3 border border-white/10 bg-black">
-              <span className="mstv-ui-label">Session</span>
-              <input
-                value={sessionSlugDraft}
-                onChange={(event) => setSessionSlugDraft(event.target.value)}
-                placeholder="studio"
-                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-600"
-              />
-            </label>
-            {sessionSlugNeedsSanitizing ? (
-              <span className="text-xs text-slate-500">
-                Suggestion : {sanitizedSessionSlug}
-              </span>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
+            <form
+              className="contents"
+              onSubmit={(event) => {
+                event.preventDefault();
                 void handleApplySessionSlug();
               }}
-              className="mstv-ui-button border border-white/10 bg-white/10 text-white transition hover:bg-white/15"
             >
-              Appliquer
-            </button>
+              <label className="mstv-ui-field min-w-[260px] gap-3 border border-white/10 bg-black">
+                <span className="mstv-ui-label">Session</span>
+                <input
+                  value={sessionSlugDraft}
+                  onChange={(event) => setSessionSlugDraft(event.target.value)}
+                  placeholder="studio"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-600"
+                />
+              </label>
+              {sessionSlugNeedsSanitizing ? (
+                <span className="text-xs text-slate-500">
+                  Suggestion : {sanitizedSessionSlug}
+                </span>
+              ) : null}
+              <button
+                type="submit"
+                disabled={isApplyingSessionSlug}
+                className="mstv-ui-button border border-white/10 bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-wait disabled:opacity-60"
+              >
+                Appliquer
+              </button>
+            </form>
             <button
               type="button"
               onClick={() => {
