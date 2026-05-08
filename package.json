@@ -74,6 +74,7 @@
     ],
     "mac": {
       "category": "public.app-category.video",
+      "icon": "assets/icons/mstv-visio.icns",
       "target": "dir",
       "hardenedRuntime": true,
       "entitlements": "desktop/entitlements.mac.plist",
