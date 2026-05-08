@@ -17,6 +17,7 @@
   },
   "mac": {
     "category": "public.app-category.productivity",
+    "icon": "assets/icons/mstv-visio.icns",
     "target": "dir",
     "hardenedRuntime": true,
     "entitlements": "slides/entitlements.mac.plist",
