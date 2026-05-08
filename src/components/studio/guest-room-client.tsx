@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   GuestContributionSurface,
   GuestProgramReturnSurface
@@ -12,6 +12,7 @@ import type { TokenResponsePayload } from "@/lib/types/livekit";
 import type { StudioMessage } from "@/lib/types/messaging";
 import type {
   LiveRoomSnapshot,
+  GuestVirtualBackgroundMode,
   PendingSlideControlCommand,
   ProductionSnapshot,
   PrivateChatMessage,
@@ -164,6 +165,12 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
   const [liveRegieAudioMuted, setLiveRegieAudioMuted] = useState(false);
   const [liveAssignedReturnSource, setLiveAssignedReturnSource] = useState<ReturnSource | null>(null);
   const [slideControlAuthorized, setSlideControlAuthorized] = useState(false);
+  const [virtualBackgroundAuthorized, setVirtualBackgroundAuthorized] = useState(false);
+  const [virtualBackgroundMode, setVirtualBackgroundMode] =
+    useState<GuestVirtualBackgroundMode>("none");
+  const [virtualBackgroundImageName, setVirtualBackgroundImageName] = useState<string | null>(null);
+  const [virtualBackgroundImageUrl, setVirtualBackgroundImageUrl] = useState<string | null>(null);
+  const [virtualBackgroundWarning, setVirtualBackgroundWarning] = useState<string | null>(null);
   const [pendingSlideCommand, setPendingSlideCommand] =
     useState<PendingSlideControlCommand | null>(null);
   const [privateChatMessages, setPrivateChatMessages] = useState<PrivateChatMessage[]>([]);
@@ -186,6 +193,31 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
       behavior: "smooth"
     });
   }, [privateChatMessages.length, privateChatOpen]);
+
+  useEffect(() => {
+    if (virtualBackgroundAuthorized) {
+      return;
+    }
+
+    setVirtualBackgroundMode("none");
+    setVirtualBackgroundImageName(null);
+    setVirtualBackgroundImageUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+
+      return null;
+    });
+    setVirtualBackgroundWarning(null);
+  }, [virtualBackgroundAuthorized]);
+
+  useEffect(() => {
+    return () => {
+      if (virtualBackgroundImageUrl) {
+        URL.revokeObjectURL(virtualBackgroundImageUrl);
+      }
+    };
+  }, [virtualBackgroundImageUrl]);
 
   useEffect(() => {
     return () => {
@@ -512,6 +544,38 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
     });
   }
 
+  function handleVirtualBackgroundImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    const isAcceptedImage =
+      /^image\/(jpeg|png|webp)$/.test(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name);
+
+    if (!isAcceptedImage) {
+      setVirtualBackgroundMode("none");
+      setVirtualBackgroundImageName(null);
+      setVirtualBackgroundWarning("Image non compatible.");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+
+    setVirtualBackgroundImageUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+
+      return objectUrl;
+    });
+    setVirtualBackgroundImageName(file.name);
+    setVirtualBackgroundMode("image");
+    setVirtualBackgroundWarning(null);
+    event.currentTarget.value = "";
+  }
+
   function appendPrivateChatMessage(message: PrivateChatMessage) {
     setPrivateChatMessages((current) => {
       if (current.some((existingMessage) => existingMessage.messageId === message.messageId)) {
@@ -718,17 +782,20 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
     );
   }
 
+  const guestControlPanelCount =
+    (slideControlAuthorized ? 1 : 0) + (virtualBackgroundAuthorized ? 1 : 0);
+  const playerVerticalReserve =
+    guestControlPanelCount > 1 ? "10.5rem" : guestControlPanelCount === 1 ? "6.75rem" : "1rem";
+
   return (
     <main className="h-[100svh] overflow-hidden bg-black text-white">
       <div className="relative mx-auto flex h-full w-full flex-col items-center justify-center gap-3 p-2">
         <div
           className="relative aspect-video overflow-hidden rounded-[14px] bg-black"
           style={{
-            maxHeight: slideControlAuthorized ? "calc(100svh - 6.75rem)" : "calc(100svh - 1rem)",
+            maxHeight: `calc(100svh - ${playerVerticalReserve})`,
             maxWidth: "1180px",
-            width: slideControlAuthorized
-              ? "min(1180px, calc((100svh - 6.75rem) * 1.77778), 100%)"
-              : "min(1180px, calc((100svh - 1rem) * 1.77778), 100%)"
+            width: `min(1180px, calc((100svh - ${playerVerticalReserve}) * 1.77778), 100%)`
           }}
         >
           <GuestProgramReturnSurface
@@ -742,6 +809,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
             onProgramAudioMutedChange={setLiveProgramAudioMuted}
             onRegieAudioMutedChange={setLiveRegieAudioMuted}
             onSlideControlAuthorizedChange={setSlideControlAuthorized}
+            onVirtualBackgroundAuthorizedChange={setVirtualBackgroundAuthorized}
             pendingSlideCommand={pendingSlideCommand}
             onSlideCommandSent={(commandId) => {
               setPendingSlideCommand((current) =>
@@ -769,6 +837,9 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                   );
                 }}
                 onPrivateChatMessageReceived={handlePrivateChatReceived}
+                virtualBackgroundMode={virtualBackgroundAuthorized ? virtualBackgroundMode : "none"}
+                virtualBackgroundImageUrl={virtualBackgroundImageUrl}
+                onVirtualBackgroundWarning={setVirtualBackgroundWarning}
               />
 
               <div className="absolute left-2 top-2 z-20 flex gap-1.5">
@@ -895,6 +966,57 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                 Suivant →
               </button>
             </div>
+          </div>
+        ) : null}
+        {virtualBackgroundAuthorized ? (
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+              Fond
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {[
+                { value: "none", label: "Aucun" },
+                { value: "blur", label: "Flou" }
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setVirtualBackgroundMode(option.value as GuestVirtualBackgroundMode)}
+                  className={`rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] transition ${
+                    virtualBackgroundMode === option.value
+                      ? "border-transparent bg-sky-500 text-white"
+                      : "border-white/15 bg-white/10 text-white hover:bg-white/15"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+              <label
+                className={`cursor-pointer rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] transition ${
+                  virtualBackgroundMode === "image"
+                    ? "border-transparent bg-sky-500 text-white"
+                    : "border-white/15 bg-white/10 text-white hover:bg-white/15"
+                }`}
+              >
+                Image personnalisée
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={handleVirtualBackgroundImageChange}
+                />
+              </label>
+            </div>
+            {virtualBackgroundImageName ? (
+              <p className="max-w-[80vw] truncate text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                {virtualBackgroundImageName}
+              </p>
+            ) : null}
+            {virtualBackgroundWarning ? (
+              <p className="max-w-[80vw] text-center text-[10px] font-medium text-signal">
+                {virtualBackgroundWarning}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -3,6 +3,7 @@ import type { ControlRole, SessionChannel, SurfaceRole } from "@/lib/types/roles
 
 export const returnSources = ["STUDIO", "REGIE", "IMAGE"] as const;
 export type ReturnSource = (typeof returnSources)[number];
+export type GuestVirtualBackgroundMode = "none" | "blur" | "image";
 
 export type SlideControlCommandType = "NEXT_SLIDE" | "PREV_SLIDE";
 

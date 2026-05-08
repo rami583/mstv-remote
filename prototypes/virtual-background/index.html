@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MSTV Virtual Background Prototype</title>
+    <style>
+      :root {
+        --bg: #050505;
+        --panel: #121212;
+        --panel-soft: #1b1b1b;
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #ffffff;
+        --muted: #a1a1aa;
+        --blue: #0ea5e9;
+        --green: #22c55e;
+        --red: #d4301f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 34rem),
+          radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.09), transparent 30rem),
+          var(--bg);
+        color: var(--text);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      button,
+      select {
+        font: inherit;
+      }
+
+      .app {
+        width: min(1280px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 24px 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(22px, 3vw, 36px);
+        letter-spacing: -0.04em;
+      }
+
+      .subtitle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .metric {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 112px;
+        justify-content: center;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.08);
+        padding: 9px 14px;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .metric-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 16px rgba(34, 197, 94, 0.6);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 18px;
+      }
+
+      .stage,
+      .panel {
+        border: 1px solid var(--line);
+        background: rgba(18, 18, 18, 0.86);
+        border-radius: 26px;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      }
+
+      .stage {
+        overflow: hidden;
+      }
+
+      .canvas-wrap {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        background: #000;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      video {
+        position: absolute;
+        left: -9999px;
+        top: -9999px;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+        text-align: center;
+        color: var(--muted);
+        background: #000;
+      }
+
+      .panel {
+        padding: 18px;
+      }
+
+      .panel h2 {
+        margin: 0 0 14px;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .controls {
+        display: grid;
+        gap: 12px;
+      }
+
+      .button-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .button,
+      .select,
+      .range {
+        min-height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.09);
+        color: white;
+        padding: 0 14px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .button {
+        cursor: pointer;
+      }
+
+      .button:hover,
+      .select:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .button.primary {
+        border-color: transparent;
+        background: var(--blue);
+      }
+
+      .button.danger {
+        border-color: transparent;
+        background: var(--red);
+      }
+
+      .select {
+        width: 100%;
+      }
+
+      .file-input {
+        display: none;
+      }
+
+      .range-control {
+        display: grid;
+        gap: 8px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.06);
+        padding: 12px;
+      }
+
+      .range-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .range {
+        width: 100%;
+        min-height: auto;
+        padding: 0;
+        accent-color: var(--blue);
+      }
+
+      .status {
+        min-height: 56px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.06);
+        padding: 12px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .note {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .checklist {
+        margin: 16px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 8px;
+        color: #d4d4d8;
+        font-size: 13px;
+      }
+
+      .checklist li::before {
+        content: "";
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        margin-right: 8px;
+        border-radius: 999px;
+        background: var(--blue);
+        vertical-align: 1px;
+      }
+
+      @media (max-width: 920px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+      const { useEffect, useMemo, useRef, useState } = React;
+
+      const backgroundSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+          <defs>
+            <linearGradient id="wall" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#20242a"/>
+              <stop offset="52%" stop-color="#12151a"/>
+              <stop offset="100%" stop-color="#2a2f35"/>
+            </linearGradient>
+            <radialGradient id="glow" cx="50%" cy="26%" r="62%">
+              <stop offset="0%" stop-color="#5f6f7d" stop-opacity="0.55"/>
+              <stop offset="100%" stop-color="#0f1115" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="1920" height="1080" fill="url(#wall)"/>
+          <rect width="1920" height="1080" fill="url(#glow)"/>
+          <path d="M0 800 C420 700 670 745 960 690 C1270 632 1490 700 1920 610 L1920 1080 L0 1080 Z" fill="#0d0f13" opacity="0.72"/>
+          <rect x="0" y="812" width="1920" height="268" fill="#111318"/>
+          <rect x="220" y="240" width="1480" height="390" rx="42" fill="#ffffff" opacity="0.035"/>
+          <rect x="274" y="294" width="1372" height="282" rx="30" fill="#000000" opacity="0.18"/>
+          <circle cx="1510" cy="330" r="86" fill="#ffffff" opacity="0.045"/>
+          <circle cx="390" cy="536" r="120" fill="#0ea5e9" opacity="0.10"/>
+        </svg>
+      `;
+
+      function createBackgroundImage() {
+        const image = new Image();
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(backgroundSvg)}`;
+        return image;
+      }
+
+      function drawCover(ctx, image, width, height) {
+        const sourceWidth = image.videoWidth || image.naturalWidth || image.width;
+        const sourceHeight = image.videoHeight || image.naturalHeight || image.height;
+
+        if (!sourceWidth || !sourceHeight) {
+          return;
+        }
+
+        const sourceAspect = sourceWidth / sourceHeight;
+        const targetAspect = width / height;
+        let drawWidth = width;
+        let drawHeight = height;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        if (sourceAspect > targetAspect) {
+          drawHeight = height;
+          drawWidth = drawHeight * sourceAspect;
+          offsetX = (width - drawWidth) / 2;
+        } else {
+          drawWidth = width;
+          drawHeight = drawWidth / sourceAspect;
+          offsetY = (height - drawHeight) / 2;
+        }
+
+        ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+      }
+
+      function drawCenteredScale(ctx, draw, width, height, scale) {
+        ctx.save();
+        ctx.translate(width / 2, height / 2);
+        ctx.scale(scale, scale);
+        ctx.translate(-width / 2, -height / 2);
+        draw();
+        ctx.restore();
+      }
+
+      function App() {
+        const videoRef = useRef(null);
+        const canvasRef = useRef(null);
+        const segmentationRef = useRef(null);
+        const backgroundRef = useRef(createBackgroundImage());
+        const backgroundUrlRef = useRef(null);
+        const modeRef = useRef("image");
+        const blurAmountRef = useRef(18);
+        const edgeSoftnessRef = useRef(3);
+        const maskCanvasRef = useRef(document.createElement("canvas"));
+        const personCanvasRef = useRef(document.createElement("canvas"));
+        const backgroundCanvasRef = useRef(document.createElement("canvas"));
+        const rafRef = useRef(0);
+        const processingRef = useRef(false);
+        const framesRef = useRef([]);
+        const [streamReady, setStreamReady] = useState(false);
+        const [enabled, setEnabled] = useState(true);
+        const [mode, setMode] = useState("image");
+        const [backgroundName, setBackgroundName] = useState("Professional placeholder");
+        const [blurAmount, setBlurAmount] = useState(18);
+        const [edgeSoftness, setEdgeSoftness] = useState(3);
+        const [fps, setFps] = useState(0);
+        const [status, setStatus] = useState("Click Start Camera to begin.");
+        const effectiveMode = enabled ? mode : "original";
+
+        useEffect(() => {
+          modeRef.current = effectiveMode;
+        }, [effectiveMode]);
+
+        useEffect(() => {
+          blurAmountRef.current = blurAmount;
+        }, [blurAmount]);
+
+        useEffect(() => {
+          edgeSoftnessRef.current = edgeSoftness;
+        }, [edgeSoftness]);
+
+        useEffect(() => {
+          const segmentation = new SelfieSegmentation({
+            locateFile: (file) =>
+              `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
+          });
+
+          segmentation.setOptions({
+            modelSelection: 1,
+            selfieMode: false,
+          });
+
+          segmentation.onResults((results) => {
+            drawResults(results);
+            processingRef.current = false;
+          });
+
+          segmentationRef.current = segmentation;
+
+          return () => {
+            cancelAnimationFrame(rafRef.current);
+            segmentationRef.current?.close?.();
+            if (backgroundUrlRef.current) {
+              URL.revokeObjectURL(backgroundUrlRef.current);
+            }
+          };
+        }, []);
+
+        useEffect(() => {
+          if (!streamReady) {
+            return;
+          }
+
+          const loop = async () => {
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+
+            if (!video || !canvas || video.readyState < 2) {
+              rafRef.current = requestAnimationFrame(loop);
+              return;
+            }
+
+            updateFps();
+
+            if (modeRef.current === "original") {
+              const ctx = canvas.getContext("2d");
+              drawOriginal(ctx, video, canvas);
+              rafRef.current = requestAnimationFrame(loop);
+              return;
+            }
+
+            if (!processingRef.current && segmentationRef.current) {
+              processingRef.current = true;
+              await segmentationRef.current.send({ image: video });
+            }
+
+            rafRef.current = requestAnimationFrame(loop);
+          };
+
+          rafRef.current = requestAnimationFrame(loop);
+
+          return () => {
+            cancelAnimationFrame(rafRef.current);
+          };
+        }, [streamReady, effectiveMode]);
+
+        function updateFps() {
+          const now = performance.now();
+          framesRef.current = [...framesRef.current.filter((time) => now - time < 1000), now];
+          setFps(framesRef.current.length);
+        }
+
+        function resizeCanvasToVideo(canvas, video) {
+          const width = video.videoWidth || 1280;
+          const height = video.videoHeight || 720;
+
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+          }
+        }
+
+        function resizeScratchCanvas(canvas, width, height) {
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+          }
+        }
+
+        function drawOriginal(ctx, source, canvas) {
+          resizeCanvasToVideo(canvas, source);
+          ctx.save();
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          drawCover(ctx, source, canvas.width, canvas.height);
+          ctx.restore();
+        }
+
+        function drawResults(results) {
+          const canvas = canvasRef.current;
+          const ctx = canvas?.getContext("2d");
+
+          if (!canvas || !ctx || !results.image) {
+            return;
+          }
+
+          resizeCanvasToVideo(canvas, results.image);
+          const mode = modeRef.current;
+
+          if (mode === "original") {
+            drawOriginal(ctx, results.image, canvas);
+            return;
+          }
+
+          const width = canvas.width;
+          const height = canvas.height;
+          const maskCanvas = maskCanvasRef.current;
+          const personCanvas = personCanvasRef.current;
+          const backgroundCanvas = backgroundCanvasRef.current;
+          const blurScale = mode === "blur" ? 1.07 : 1;
+          const maskCtx = maskCanvas.getContext("2d");
+          const personCtx = personCanvas.getContext("2d");
+          const backgroundCtx = backgroundCanvas.getContext("2d");
+
+          resizeScratchCanvas(maskCanvas, width, height);
+          resizeScratchCanvas(personCanvas, width, height);
+          resizeScratchCanvas(backgroundCanvas, width, height);
+
+          maskCtx.save();
+          maskCtx.clearRect(0, 0, width, height);
+          maskCtx.filter = edgeSoftnessRef.current > 0 ? `blur(${edgeSoftnessRef.current}px)` : "none";
+          maskCtx.drawImage(results.segmentationMask, 0, 0, width, height);
+          maskCtx.filter = "none";
+          maskCtx.restore();
+
+          personCtx.save();
+          personCtx.clearRect(0, 0, width, height);
+          personCtx.drawImage(maskCanvas, 0, 0, width, height);
+          personCtx.globalCompositeOperation = "source-in";
+          drawCover(personCtx, results.image, width, height);
+          personCtx.restore();
+
+          backgroundCtx.save();
+          backgroundCtx.clearRect(0, 0, width, height);
+
+          if (mode === "blur") {
+            drawCenteredScale(
+              backgroundCtx,
+              () => drawCover(backgroundCtx, results.image, width, height),
+              width,
+              height,
+              blurScale,
+            );
+            backgroundCtx.filter = `blur(${blurAmountRef.current}px)`;
+            drawCenteredScale(
+              backgroundCtx,
+              () => drawCover(backgroundCtx, results.image, width, height),
+              width,
+              height,
+              blurScale,
+            );
+            backgroundCtx.filter = "none";
+          } else {
+            drawCover(backgroundCtx, backgroundRef.current, width, height);
+          }
+
+          backgroundCtx.restore();
+
+          ctx.save();
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(backgroundCanvas, 0, 0, width, height);
+          if (mode === "blur") {
+            drawCenteredScale(
+              ctx,
+              () => ctx.drawImage(personCanvas, 0, 0, width, height),
+              width,
+              height,
+              blurScale,
+            );
+          } else {
+            ctx.drawImage(personCanvas, 0, 0, width, height);
+          }
+          ctx.restore();
+        }
+
+        async function startCamera() {
+          try {
+            setStatus("Requesting camera permission...");
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30 },
+              },
+              audio: false,
+            });
+
+            const video = videoRef.current;
+            video.srcObject = stream;
+            await video.play();
+            setStreamReady(true);
+            setStatus("Camera running. Evaluate edges, hair, motion and latency.");
+          } catch (error) {
+            setStatus(error instanceof Error ? error.message : "Unable to start camera.");
+          }
+        }
+
+        function stopCamera() {
+          const stream = videoRef.current?.srcObject;
+          if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+          }
+          videoRef.current.srcObject = null;
+          setStreamReady(false);
+          setFps(0);
+          setStatus("Camera stopped.");
+        }
+
+        function handleBackgroundUpload(event) {
+          const file = event.target.files?.[0];
+
+          if (!file) {
+            return;
+          }
+
+          const isAcceptedImage =
+            /^image\/(jpeg|png|webp)$/.test(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name);
+
+          if (!isAcceptedImage) {
+            setStatus("Please choose a JPG, PNG or WebP image.");
+            return;
+          }
+
+          if (backgroundUrlRef.current) {
+            URL.revokeObjectURL(backgroundUrlRef.current);
+          }
+
+          const objectUrl = URL.createObjectURL(file);
+          const image = new Image();
+
+          image.onload = () => {
+            backgroundRef.current = image;
+            backgroundUrlRef.current = objectUrl;
+            setBackgroundName(file.name);
+            setMode("image");
+            setEnabled(true);
+            setStatus(`Background loaded: ${file.name}`);
+          };
+          image.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            setStatus("Unable to load this background image.");
+          };
+          image.src = objectUrl;
+          event.currentTarget.value = "";
+        }
+
+        return (
+          <main className="app">
+            <header className="topbar">
+              <div>
+                <h1>Virtual Background Prototype</h1>
+                <p className="subtitle">
+                  Isolated browser test: webcam → MediaPipe segmentation → real-time canvas.
+                </p>
+              </div>
+              <div className="metric">
+                <span className="metric-dot" />
+                {fps} FPS
+              </div>
+            </header>
+
+            <section className="layout">
+              <div className="stage">
+                <div className="canvas-wrap">
+                  <video ref={videoRef} playsInline muted />
+                  <canvas ref={canvasRef} />
+                  {!streamReady ? (
+                    <div className="empty">
+                      Start the camera to evaluate background replacement quality.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <aside className="panel">
+                <h2>Controls</h2>
+                <div className="controls">
+                  <div className="button-row">
+                    <button
+                      className="button primary"
+                      type="button"
+                      onClick={startCamera}
+                      disabled={streamReady}
+                    >
+                      Start Camera
+                    </button>
+                    <button
+                      className="button danger"
+                      type="button"
+                      onClick={stopCamera}
+                      disabled={!streamReady}
+                    >
+                      Stop
+                    </button>
+                  </div>
+
+                  <button
+                    className={enabled ? "button primary" : "button"}
+                    type="button"
+                    onClick={() => setEnabled((value) => !value)}
+                  >
+                    {enabled ? "Replacement On" : "Replacement Off"}
+                  </button>
+
+                  <select className="select" value={mode} onChange={(event) => setMode(event.target.value)}>
+                    <option value="original">Original Webcam</option>
+                    <option value="blur">Blur Background</option>
+                    <option value="image">Image Background</option>
+                  </select>
+
+                  <label className="button" htmlFor="background-upload">
+                    Choisir une image de fond
+                  </label>
+                  <input
+                    id="background-upload"
+                    className="file-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    onChange={handleBackgroundUpload}
+                  />
+
+                  <div className="range-control">
+                    <label className="range-label" htmlFor="blur-range">
+                      Blur amount <span>{blurAmount}px</span>
+                    </label>
+                    <input
+                      id="blur-range"
+                      className="range"
+                      type="range"
+                      min="0"
+                      max="36"
+                      step="1"
+                      value={blurAmount}
+                      onChange={(event) => setBlurAmount(Number(event.target.value))}
+                    />
+                  </div>
+
+                  <div className="range-control">
+                    <label className="range-label" htmlFor="edge-range">
+                      Edge softness <span>{edgeSoftness}px</span>
+                    </label>
+                    <input
+                      id="edge-range"
+                      className="range"
+                      type="range"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={edgeSoftness}
+                      onChange={(event) => setEdgeSoftness(Number(event.target.value))}
+                    />
+                  </div>
+
+                  <div className="status">{status}</div>
+                  <div className="status">Background: {backgroundName}</div>
+                </div>
+
+                <ul className="checklist">
+                  <li>Check hair and shoulder edges.</li>
+                  <li>Move hands quickly near face.</li>
+                  <li>Check latency while speaking naturally.</li>
+                  <li>Watch FPS stability and fan/CPU behavior.</li>
+                  <li>Compare blur vs image background perception.</li>
+                </ul>
+
+                <p className="note">
+                  This prototype is intentionally isolated: no LiveKit, no Electron, no MSTV Visio routing.
+                </p>
+              </aside>
+            </section>
+          </main>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>

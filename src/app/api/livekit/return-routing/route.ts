@@ -15,6 +15,7 @@ const returnRoutingSyncSchema = z.object({
   programMutedGuestIds: z.array(z.string().trim().min(1).max(180)).optional(),
   regieMutedGuestIds: z.array(z.string().trim().min(1).max(180)).optional(),
   slideControlEnabledGuestIds: z.array(z.string().trim().min(1).max(180)).optional(),
+  virtualBackgroundEnabledGuestIds: z.array(z.string().trim().min(1).max(180)).optional(),
   guestReturnOverrides: z.record(z.enum(returnSources).optional()),
   routingVersion: z.number().finite().positive()
 });
@@ -75,6 +76,9 @@ export async function POST(request: Request) {
     const canControlSlides = (parsed.data.slideControlEnabledGuestIds ?? []).includes(
       contributionParticipantId
     );
+    const canUseVirtualBackground = (parsed.data.virtualBackgroundEnabledGuestIds ?? []).includes(
+      contributionParticipantId
+    );
     const assignedReturnSource = getEffectiveReturnSource({
       contributionParticipantId,
       programGuestIds: parsed.data.programGuestIds,
@@ -88,6 +92,7 @@ export async function POST(request: Request) {
       programAudioMuted,
       regieAudioMuted,
       canControlSlides,
+      canUseVirtualBackground,
       returnRoutingVersion: parsed.data.routingVersion
     };
 

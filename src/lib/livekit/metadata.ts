@@ -12,6 +12,7 @@ export interface ParticipantMetadata {
   programAudioMuted?: boolean | null;
   regieAudioMuted?: boolean | null;
   canControlSlides?: boolean | null;
+  canUseVirtualBackground?: boolean | null;
   returnRoutingVersion?: number | null;
 }
 

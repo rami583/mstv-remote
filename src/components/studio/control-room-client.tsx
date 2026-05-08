@@ -844,6 +844,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
   const [regieMutedGuestIds, setRegieMutedGuestIds] = useState<string[]>([]);
   const [pipModeEnabled, setPipModeEnabled] = useState(false);
   const [slideControlEnabledGuestIds, setSlideControlEnabledGuestIds] = useState<string[]>([]);
+  const [virtualBackgroundEnabledGuestIds, setVirtualBackgroundEnabledGuestIds] = useState<string[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceOption[]>([]);
   const [audioInputs, setAudioInputs] = useState<MediaDeviceOption[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<MediaDeviceOption[]>([]);
@@ -1390,6 +1391,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             returnSourceControlDisabled: inProgram,
             disconnectControlDisabled: inProgram,
             slideControlEnabled: slideControlEnabledGuestIds.includes(guest.participantId),
+            virtualBackgroundEnabled: virtualBackgroundEnabledGuestIds.includes(guest.participantId),
             cameraIndicator: isActiveInRegie
               ? activeRegieIndicator
               : computeVideoIndicator({
@@ -1418,7 +1420,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       regieMutedGuestIds,
       programGuestIds,
       room,
-      slideControlEnabledGuestIds
+      slideControlEnabledGuestIds,
+      virtualBackgroundEnabledGuestIds
     ]
   );
   const visuallyActiveReturnSources = useMemo(
@@ -1570,6 +1573,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
             programMutedGuestIds,
             regieMutedGuestIds,
             slideControlEnabledGuestIds,
+            virtualBackgroundEnabledGuestIds,
             guestReturnOverrides,
             routingVersion: Date.parse(productionSnapshot.updatedAt) || Date.now()
           }
@@ -1582,7 +1586,8 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       regieMutedGuestIds,
       programGuestIds,
       room,
-      slideControlEnabledGuestIds
+      slideControlEnabledGuestIds,
+      virtualBackgroundEnabledGuestIds
     ]
   );
 
@@ -1619,6 +1624,9 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       setSlideControlEnabledGuestIds((current) =>
         current.filter((participantId) => presentGuestIds.includes(participantId))
       );
+      setVirtualBackgroundEnabledGuestIds((current) =>
+        current.filter((participantId) => presentGuestIds.includes(participantId))
+      );
       setProgramMutedGuestIds((current) =>
         current.filter((participantId) => presentGuestIds.includes(participantId))
       );
@@ -1630,6 +1638,9 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       current.filter((participantId) => nextSelection.includes(participantId))
     );
     setSlideControlEnabledGuestIds((current) =>
+      current.filter((participantId) => presentGuestIds.includes(participantId))
+    );
+    setVirtualBackgroundEnabledGuestIds((current) =>
       current.filter((participantId) => presentGuestIds.includes(participantId))
     );
     updateLocalProductionSnapshot((snapshot) => ({
@@ -1805,6 +1816,14 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
 
   function handleToggleGuestSlideControl(participantId: string) {
     setSlideControlEnabledGuestIds((current) =>
+      current.includes(participantId)
+        ? current.filter((guestId) => guestId !== participantId)
+        : [...current, participantId]
+    );
+  }
+
+  function handleToggleGuestVirtualBackground(participantId: string) {
+    setVirtualBackgroundEnabledGuestIds((current) =>
       current.includes(participantId)
         ? current.filter((guestId) => guestId !== participantId)
         : [...current, participantId]
@@ -2053,6 +2072,9 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
       current ? current.filter((guestId) => guestId !== participantId) : current
     );
     setSlideControlEnabledGuestIds((current) =>
+      current.filter((guestId) => guestId !== participantId)
+    );
+    setVirtualBackgroundEnabledGuestIds((current) =>
       current.filter((guestId) => guestId !== participantId)
     );
     updateLocalProductionSnapshot((snapshot) => ({
@@ -2641,6 +2663,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
           onToggleProgramAudioMute={handleToggleProgramAudioMute}
           onToggleRegieAudioMute={handleToggleRegieAudioMute}
           onToggleGuestSlideControl={handleToggleGuestSlideControl}
+          onToggleGuestVirtualBackground={handleToggleGuestVirtualBackground}
           onAdjustGuestVideoFraming={handleAdjustGuestVideoFraming}
           onSelectGuestReturnSource={handleSelectGuestReturnSource}
           onDisconnectGuest={handleDisconnectGuest}

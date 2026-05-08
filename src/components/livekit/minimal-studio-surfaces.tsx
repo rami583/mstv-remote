@@ -19,6 +19,7 @@ import { getIndicatorClasses, type MediaStatusIndicator } from "@/lib/studio/med
 import type { TokenResponsePayload } from "@/lib/types/livekit";
 import type {
   GuestVideoFraming,
+  GuestVirtualBackgroundMode,
   LiveRoomSnapshot,
   PendingSlideControlCommand,
   PrivateChatMessage,
@@ -42,6 +43,9 @@ interface GuestContributionSurfaceProps extends BaseSessionProps {
   pendingPrivateChatMessage?: PrivateChatMessage | null;
   onPrivateChatMessageSent?: (messageId: string) => void;
   onPrivateChatMessageReceived?: (message: PrivateChatMessage) => void;
+  virtualBackgroundMode?: GuestVirtualBackgroundMode;
+  virtualBackgroundImageUrl?: string | null;
+  onVirtualBackgroundWarning?: (warning: string | null) => void;
 }
 
 interface ProgramReturnSurfaceProps extends BaseSessionProps {
@@ -53,6 +57,7 @@ interface ProgramReturnSurfaceProps extends BaseSessionProps {
   onProgramAudioMutedChange?: (isMuted: boolean) => void;
   onRegieAudioMutedChange?: (isMuted: boolean) => void;
   onSlideControlAuthorizedChange?: (authorized: boolean) => void;
+  onVirtualBackgroundAuthorizedChange?: (authorized: boolean) => void;
   pendingSlideCommand?: PendingSlideControlCommand | null;
   onSlideCommandSent?: (commandId: string) => void;
 }
@@ -82,12 +87,14 @@ interface ControlGuestGridSurfaceProps extends BaseSessionProps {
     returnSourceControlDisabled: boolean;
     disconnectControlDisabled: boolean;
     slideControlEnabled: boolean;
+    virtualBackgroundEnabled: boolean;
     videoFraming: GuestVideoFraming;
   }>;
   onToggleGuest: (participantId: string) => void;
   onToggleProgramAudioMute?: (participantId: string) => void;
   onToggleRegieAudioMute?: (participantId: string) => void;
   onToggleGuestSlideControl?: (participantId: string) => void;
+  onToggleGuestVirtualBackground?: (participantId: string) => void;
   onAdjustGuestVideoFraming?: (participantId: string, action: GuestVideoFramingAction) => void;
   onSelectGuestReturnSource?: (participantId: string, source: ReturnSource) => void;
   onDisconnectGuest?: (participantId: string) => void;
@@ -156,11 +163,134 @@ interface ProgramReturnRoutingPayload {
   programMutedGuestIds?: string[];
   regieMutedGuestIds?: string[];
   slideControlEnabledGuestIds?: string[];
+  virtualBackgroundEnabledGuestIds?: string[];
   guestReturnOverrides: Record<string, ReturnSource | undefined>;
   routingVersion: number;
 }
 
 const privateChatTopic = "mstv:private-chat";
+const selfieSegmentationScriptUrl =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js";
+const virtualBackgroundFps = 25;
+const virtualBackgroundBlurPx = 18;
+const virtualBackgroundEdgeSoftnessPx = 3;
+const virtualBackgroundBlurScale = 1.07;
+
+interface SelfieSegmentationResult {
+  image: CanvasImageSource;
+  segmentationMask: CanvasImageSource;
+}
+
+interface SelfieSegmentationInstance {
+  setOptions(options: { modelSelection: number; selfieMode: boolean }): void;
+  onResults(callback: (results: SelfieSegmentationResult) => void): void;
+  send(input: { image: CanvasImageSource }): Promise<void>;
+  close?: () => void;
+}
+
+declare global {
+  interface Window {
+    SelfieSegmentation?: new (options: {
+      locateFile: (file: string) => string;
+    }) => SelfieSegmentationInstance;
+    __mstvSelfieSegmentationPromise?: Promise<void>;
+  }
+}
+
+function loadSelfieSegmentation() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("MediaPipe indisponible."));
+  }
+
+  if (window.SelfieSegmentation) {
+    return Promise.resolve();
+  }
+
+  window.__mstvSelfieSegmentationPromise ??= new Promise<void>((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${selfieSegmentationScriptUrl}"]`
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("MediaPipe indisponible.")), {
+        once: true
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = selfieSegmentationScriptUrl;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("MediaPipe indisponible."));
+    document.head.appendChild(script);
+  });
+
+  return window.__mstvSelfieSegmentationPromise;
+}
+
+function drawCover(
+  context: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  width: number,
+  height: number
+) {
+  const sourceWidth =
+    "videoWidth" in image
+      ? image.videoWidth
+      : "naturalWidth" in image
+        ? image.naturalWidth
+        : "width" in image
+          ? Number(image.width)
+          : 0;
+  const sourceHeight =
+    "videoHeight" in image
+      ? image.videoHeight
+      : "naturalHeight" in image
+        ? image.naturalHeight
+        : "height" in image
+          ? Number(image.height)
+          : 0;
+
+  if (!sourceWidth || !sourceHeight) {
+    return;
+  }
+
+  const sourceAspect = sourceWidth / sourceHeight;
+  const targetAspect = width / height;
+  let drawWidth = width;
+  let drawHeight = height;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  if (sourceAspect > targetAspect) {
+    drawHeight = height;
+    drawWidth = drawHeight * sourceAspect;
+    offsetX = (width - drawWidth) / 2;
+  } else {
+    drawWidth = width;
+    drawHeight = drawWidth / sourceAspect;
+    offsetY = (height - drawHeight) / 2;
+  }
+
+  context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+}
+
+function drawCenteredScale(
+  context: CanvasRenderingContext2D,
+  draw: () => void,
+  width: number,
+  height: number,
+  scale: number
+) {
+  context.save();
+  context.translate(width / 2, height / 2);
+  context.scale(scale, scale);
+  context.translate(-width / 2, -height / 2);
+  draw();
+  context.restore();
+}
 
 function createMessageId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -451,6 +581,305 @@ function LocalPreviewContent({
   );
 }
 
+function GuestVirtualBackgroundPublisher({
+  mode,
+  imageUrl,
+  onWarning
+}: {
+  mode: GuestVirtualBackgroundMode;
+  imageUrl?: string | null;
+  onWarning?: (warning: string | null) => void;
+}) {
+  const { localParticipant } = useLocalParticipant();
+  const processedTrackRef = useRef<MediaStreamTrack | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let animationFrame = 0;
+    let inputVideo: HTMLVideoElement | null = null;
+    let outputCanvas: HTMLCanvasElement | null = null;
+    let maskCanvas: HTMLCanvasElement | null = null;
+    let personCanvas: HTMLCanvasElement | null = null;
+    let backgroundCanvas: HTMLCanvasElement | null = null;
+    let imageElement: HTMLImageElement | null = null;
+    let segmentation: SelfieSegmentationInstance | null = null;
+    let processing = false;
+    let processedTrack: MediaStreamTrack | null = null;
+    let restoredNormalCamera = false;
+
+    async function restoreNormalCamera() {
+      if (restoredNormalCamera) {
+        return;
+      }
+
+      restoredNormalCamera = true;
+
+      if (processedTrackRef.current) {
+        const trackToUnpublish = processedTrackRef.current;
+        processedTrackRef.current = null;
+
+        try {
+          await localParticipant.unpublishTrack(trackToUnpublish, true);
+        } catch {
+          trackToUnpublish.stop();
+        }
+      }
+
+      await localParticipant.setCameraEnabled(true).catch(() => undefined);
+    }
+
+    function resizeCanvas(canvas: HTMLCanvasElement, width: number, height: number) {
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+    }
+
+    function drawResults(results: SelfieSegmentationResult) {
+      if (!outputCanvas || !maskCanvas || !personCanvas || !backgroundCanvas) {
+        return;
+      }
+
+      const context = outputCanvas.getContext("2d");
+      const maskContext = maskCanvas.getContext("2d");
+      const personContext = personCanvas.getContext("2d");
+      const backgroundContext = backgroundCanvas.getContext("2d");
+
+      if (!context || !maskContext || !personContext || !backgroundContext) {
+        return;
+      }
+
+      const width = outputCanvas.width;
+      const height = outputCanvas.height;
+
+      resizeCanvas(maskCanvas, width, height);
+      resizeCanvas(personCanvas, width, height);
+      resizeCanvas(backgroundCanvas, width, height);
+
+      maskContext.save();
+      maskContext.clearRect(0, 0, width, height);
+      maskContext.filter =
+        virtualBackgroundEdgeSoftnessPx > 0
+          ? `blur(${virtualBackgroundEdgeSoftnessPx}px)`
+          : "none";
+      maskContext.drawImage(results.segmentationMask, 0, 0, width, height);
+      maskContext.filter = "none";
+      maskContext.restore();
+
+      personContext.save();
+      personContext.clearRect(0, 0, width, height);
+      personContext.drawImage(maskCanvas, 0, 0, width, height);
+      personContext.globalCompositeOperation = "source-in";
+      drawCover(personContext, results.image, width, height);
+      personContext.restore();
+
+      backgroundContext.save();
+      backgroundContext.clearRect(0, 0, width, height);
+
+      if (mode === "blur") {
+        drawCenteredScale(
+          backgroundContext,
+          () => drawCover(backgroundContext, results.image, width, height),
+          width,
+          height,
+          virtualBackgroundBlurScale
+        );
+        backgroundContext.filter = `blur(${virtualBackgroundBlurPx}px)`;
+        drawCenteredScale(
+          backgroundContext,
+          () => drawCover(backgroundContext, results.image, width, height),
+          width,
+          height,
+          virtualBackgroundBlurScale
+        );
+        backgroundContext.filter = "none";
+      } else if (imageElement) {
+        drawCover(backgroundContext, imageElement, width, height);
+      } else {
+        drawCover(backgroundContext, results.image, width, height);
+      }
+
+      backgroundContext.restore();
+
+      context.save();
+      context.clearRect(0, 0, width, height);
+      context.drawImage(backgroundCanvas, 0, 0, width, height);
+
+      if (mode === "blur") {
+        drawCenteredScale(
+          context,
+          () => context.drawImage(personCanvas!, 0, 0, width, height),
+          width,
+          height,
+          virtualBackgroundBlurScale
+        );
+      } else {
+        context.drawImage(personCanvas, 0, 0, width, height);
+      }
+
+      context.restore();
+    }
+
+    async function waitForRawCameraTrack() {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        const publication = localParticipant.getTrackPublication(Track.Source.Camera);
+        const track = publication?.track?.mediaStreamTrack;
+
+        if (
+          track &&
+          track.readyState === "live" &&
+          track.id !== processedTrackRef.current?.id
+        ) {
+          return track;
+        }
+
+        if (attempt === 0) {
+          await localParticipant.setCameraEnabled(true).catch(() => undefined);
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+      }
+
+      return null;
+    }
+
+    async function startProcessing() {
+      if (mode === "none") {
+        await restoreNormalCamera();
+        onWarning?.(null);
+        return;
+      }
+
+      try {
+        onWarning?.(null);
+        await loadSelfieSegmentation();
+
+        if (!window.SelfieSegmentation) {
+          throw new Error("MediaPipe indisponible.");
+        }
+
+        const rawTrack = await waitForRawCameraTrack();
+
+        if (!rawTrack || cancelled) {
+          throw new Error("Caméra indisponible pour le fond virtuel.");
+        }
+
+        inputVideo = document.createElement("video");
+        inputVideo.muted = true;
+        inputVideo.playsInline = true;
+        inputVideo.srcObject = new MediaStream([rawTrack]);
+        await inputVideo.play();
+
+        if (mode === "image") {
+          if (!imageUrl) {
+            throw new Error("Choisissez une image de fond.");
+          }
+
+          imageElement = new Image();
+          imageElement.src = imageUrl;
+          await imageElement.decode();
+        }
+
+        const width = rawTrack.getSettings().width || inputVideo.videoWidth || 1280;
+        const height = rawTrack.getSettings().height || inputVideo.videoHeight || 720;
+
+        outputCanvas = document.createElement("canvas");
+        maskCanvas = document.createElement("canvas");
+        personCanvas = document.createElement("canvas");
+        backgroundCanvas = document.createElement("canvas");
+        outputCanvas.width = width;
+        outputCanvas.height = height;
+
+        const outputStream = outputCanvas.captureStream(virtualBackgroundFps);
+        processedTrack = outputStream.getVideoTracks()[0] ?? null;
+
+        if (!processedTrack) {
+          throw new Error("Impossible de créer la vidéo traitée.");
+        }
+
+        segmentation = new window.SelfieSegmentation({
+          locateFile: (file) =>
+            `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+        });
+        segmentation.setOptions({
+          modelSelection: 1,
+          selfieMode: false
+        });
+        segmentation.onResults((results) => {
+          if (!cancelled) {
+            drawResults(results);
+          }
+          processing = false;
+        });
+
+        const renderLoop = async () => {
+          if (cancelled || !inputVideo || !segmentation || inputVideo.readyState < 2) {
+            animationFrame = window.requestAnimationFrame(renderLoop);
+            return;
+          }
+
+          if (!processing) {
+            processing = true;
+            await segmentation.send({ image: inputVideo }).catch(async (error) => {
+              processing = false;
+              cancelled = true;
+              onWarning?.(
+                error instanceof Error
+                  ? `Fond virtuel désactivé : ${error.message}`
+                  : "Fond virtuel désactivé."
+              );
+              await restoreNormalCamera();
+            });
+          }
+
+          animationFrame = window.requestAnimationFrame(renderLoop);
+        };
+
+        animationFrame = window.requestAnimationFrame(renderLoop);
+
+        const currentPublication = localParticipant.getTrackPublication(Track.Source.Camera);
+        const currentTrack = currentPublication?.track?.mediaStreamTrack;
+
+        if (currentTrack && currentTrack.id !== processedTrackRef.current?.id) {
+          await localParticipant.unpublishTrack(currentTrack, false).catch(() => undefined);
+        }
+
+        processedTrackRef.current = processedTrack;
+        await localParticipant.publishTrack(processedTrack, {
+          source: Track.Source.Camera,
+          name: "virtual-background-camera"
+        });
+      } catch (error) {
+        if (!cancelled) {
+          onWarning?.(
+            error instanceof Error
+              ? `Fond virtuel désactivé : ${error.message}`
+              : "Fond virtuel désactivé."
+          );
+          await restoreNormalCamera();
+        }
+      }
+    }
+
+    void startProcessing();
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(animationFrame);
+      segmentation?.close?.();
+
+      if (inputVideo) {
+        inputVideo.pause();
+        inputVideo.srcObject = null;
+      }
+
+      void restoreNormalCamera();
+    };
+  }, [imageUrl, localParticipant, mode, onWarning]);
+
+  return null;
+}
+
 function GuestPrivateChatBridge({
   pendingMessage,
   onMessageSent,
@@ -530,6 +959,7 @@ function ProgramReturnContent({
   onProgramAudioMutedChange,
   onRegieAudioMutedChange,
   onSlideControlAuthorizedChange,
+  onVirtualBackgroundAuthorizedChange,
   pendingSlideCommand,
   onSlideCommandSent
 }: {
@@ -542,6 +972,7 @@ function ProgramReturnContent({
   onProgramAudioMutedChange?: (isMuted: boolean) => void;
   onRegieAudioMutedChange?: (isMuted: boolean) => void;
   onSlideControlAuthorizedChange?: (authorized: boolean) => void;
+  onVirtualBackgroundAuthorizedChange?: (authorized: boolean) => void;
   pendingSlideCommand?: PendingSlideControlCommand | null;
   onSlideCommandSent?: (commandId: string) => void;
 }) {
@@ -637,15 +1068,21 @@ function ProgramReturnContent({
     if (typeof localMetadata?.canControlSlides === "boolean") {
       onSlideControlAuthorizedChange?.(localMetadata.canControlSlides);
     }
+
+    if (typeof localMetadata?.canUseVirtualBackground === "boolean") {
+      onVirtualBackgroundAuthorizedChange?.(localMetadata.canUseVirtualBackground);
+    }
   }, [
     localMetadata?.canControlSlides,
+    localMetadata?.canUseVirtualBackground,
     localMetadata?.isInProgram,
     localMetadata?.programAudioMuted,
     localMetadata?.regieAudioMuted,
     onProgramAudioMutedChange,
     onRegieAudioMutedChange,
     onProgramStatusChange,
-    onSlideControlAuthorizedChange
+    onSlideControlAuthorizedChange,
+    onVirtualBackgroundAuthorizedChange
   ]);
 
   useEffect(() => {
@@ -670,6 +1107,9 @@ function ProgramReturnContent({
         const nextCanControlSlides = (parsed.slideControlEnabledGuestIds ?? []).some((participantId) =>
           possibleProgramStatusIds.has(participantId)
         );
+        const nextCanUseVirtualBackground = (parsed.virtualBackgroundEnabledGuestIds ?? []).some((participantId) =>
+          possibleProgramStatusIds.has(participantId)
+        );
         const nextProgramAudioMuted = (parsed.programMutedGuestIds ?? []).some((participantId) =>
           possibleProgramStatusIds.has(participantId)
         );
@@ -680,6 +1120,7 @@ function ProgramReturnContent({
         onProgramAudioMutedChange?.(nextProgramAudioMuted);
         onRegieAudioMutedChange?.(nextRegieAudioMuted);
         onSlideControlAuthorizedChange?.(nextCanControlSlides);
+        onVirtualBackgroundAuthorizedChange?.(nextCanUseVirtualBackground);
 
         const nextSource = nextIsInProgram
           ? "STUDIO"
@@ -717,6 +1158,7 @@ function ProgramReturnContent({
     onRegieAudioMutedChange,
     onProgramStatusChange,
     onSlideControlAuthorizedChange,
+    onVirtualBackgroundAuthorizedChange,
     possibleProgramStatusIds,
     room
   ]);
@@ -1923,6 +2365,7 @@ function ControlGuestGridContent({
   onToggleProgramAudioMute,
   onToggleRegieAudioMute,
   onToggleGuestSlideControl,
+  onToggleGuestVirtualBackground,
   onAdjustGuestVideoFraming,
   onSelectGuestReturnSource,
   onDisconnectGuest,
@@ -1940,6 +2383,7 @@ function ControlGuestGridContent({
   | "onToggleProgramAudioMute"
   | "onToggleRegieAudioMute"
   | "onToggleGuestSlideControl"
+  | "onToggleGuestVirtualBackground"
   | "onAdjustGuestVideoFraming"
   | "onSelectGuestReturnSource"
   | "onDisconnectGuest"
@@ -2462,6 +2906,20 @@ function ControlGuestGridContent({
                       </button>
                       <button
                         type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleGuestVirtualBackground?.(guest.participantId);
+                        }}
+                        className={`${pillBaseClassName} transition ${
+                          guest.virtualBackgroundEnabled
+                            ? activeActionPillClassName
+                            : neutralPillClassName
+                        }`}
+                      >
+                        Fond
+                      </button>
+                      <button
+                        type="button"
                         disabled={guest.disconnectControlDisabled}
                         title={
                           guest.disconnectControlDisabled
@@ -2505,6 +2963,9 @@ export function GuestContributionSurface({
   pendingPrivateChatMessage,
   onPrivateChatMessageSent,
   onPrivateChatMessageReceived,
+  virtualBackgroundMode = "none",
+  virtualBackgroundImageUrl,
+  onVirtualBackgroundWarning,
   emptyClassName = "h-full w-full bg-neutral-950"
 }: GuestContributionSurfaceProps) {
   return session ? (
@@ -2528,6 +2989,11 @@ export function GuestContributionSurface({
         onMessageSent={onPrivateChatMessageSent}
         onMessageReceived={onPrivateChatMessageReceived}
       />
+      <GuestVirtualBackgroundPublisher
+        mode={virtualBackgroundMode}
+        imageUrl={virtualBackgroundImageUrl}
+        onWarning={onVirtualBackgroundWarning}
+      />
     </LiveKitRoom>
   ) : (
     <div className={emptyClassName} />
@@ -2545,6 +3011,7 @@ export function GuestProgramReturnSurface({
   onProgramAudioMutedChange,
   onRegieAudioMutedChange,
   onSlideControlAuthorizedChange,
+  onVirtualBackgroundAuthorizedChange,
   pendingSlideCommand,
   onSlideCommandSent,
   emptyClassName = "h-full w-full bg-black"
@@ -2567,6 +3034,7 @@ export function GuestProgramReturnSurface({
         onProgramAudioMutedChange={onProgramAudioMutedChange}
         onRegieAudioMutedChange={onRegieAudioMutedChange}
         onSlideControlAuthorizedChange={onSlideControlAuthorizedChange}
+        onVirtualBackgroundAuthorizedChange={onVirtualBackgroundAuthorizedChange}
         pendingSlideCommand={pendingSlideCommand}
         onSlideCommandSent={onSlideCommandSent}
       />
@@ -2627,6 +3095,7 @@ export function ControlGuestGridSurface({
   onToggleProgramAudioMute,
   onToggleRegieAudioMute,
   onToggleGuestSlideControl,
+  onToggleGuestVirtualBackground,
   onAdjustGuestVideoFraming,
   onSelectGuestReturnSource,
   onDisconnectGuest,
@@ -2653,6 +3122,7 @@ export function ControlGuestGridSurface({
         onToggleProgramAudioMute={onToggleProgramAudioMute}
         onToggleRegieAudioMute={onToggleRegieAudioMute}
         onToggleGuestSlideControl={onToggleGuestSlideControl}
+        onToggleGuestVirtualBackground={onToggleGuestVirtualBackground}
         onAdjustGuestVideoFraming={onAdjustGuestVideoFraming}
         onSelectGuestReturnSource={onSelectGuestReturnSource}
         onDisconnectGuest={onDisconnectGuest}
