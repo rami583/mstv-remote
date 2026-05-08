@@ -837,8 +837,7 @@ function GuestVirtualBackgroundPublisher({
 
         animationFrame = window.requestAnimationFrame(renderLoop);
 
-        const currentPublication = localParticipant.getTrackPublication(Track.Source.Camera);
-        const currentTrack = currentPublication?.track?.mediaStreamTrack;
+        const currentTrack = localParticipant.getTrackPublication(Track.Source.Camera)?.track?.mediaStreamTrack;
 
         if (currentTrack && currentTrack.id !== processedTrackRef.current?.id) {
           await localParticipant.unpublishTrack(currentTrack, false).catch(() => undefined);
