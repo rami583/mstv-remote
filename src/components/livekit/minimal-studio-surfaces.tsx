@@ -2773,12 +2773,9 @@ function ControlGuestGridContent({
               </div>
 
               {guest.selectionOrder ? (
-                <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-2">
+                <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-1.5">
                   <div className="pointer-events-none">
                     <ConnectionQualityIndicator quality={guest.connectionQuality} />
-                  </div>
-                  <div className="mstv-ui-badge border border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
-                    {guest.selectionOrder}
                   </div>
                   <button
                     type="button"
@@ -2804,9 +2801,12 @@ function ControlGuestGridContent({
                   >
                     Déconnecter
                   </button>
+                  <div className="mstv-ui-badge border border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
+                    {guest.selectionOrder}
+                  </div>
                 </div>
               ) : (
-                <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-2">
+                <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-1.5">
                   <div className="pointer-events-none">
                     <ConnectionQualityIndicator quality={guest.connectionQuality} />
                   </div>
