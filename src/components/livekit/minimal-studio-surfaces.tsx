@@ -2773,15 +2773,67 @@ function ControlGuestGridContent({
               </div>
 
               {guest.selectionOrder ? (
-                <div className="pointer-events-none absolute right-4 top-4 z-20 flex flex-col items-end gap-2">
-                  <ConnectionQualityIndicator quality={guest.connectionQuality} />
+                <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-2">
+                  <div className="pointer-events-none">
+                    <ConnectionQualityIndicator quality={guest.connectionQuality} />
+                  </div>
                   <div className="mstv-ui-badge border border-transparent bg-emerald-500 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
                     {guest.selectionOrder}
                   </div>
+                  <button
+                    type="button"
+                    disabled={guest.disconnectControlDisabled}
+                    title={
+                      guest.disconnectControlDisabled
+                        ? "Retirez l’invité du programme avant de le déconnecter."
+                        : undefined
+                    }
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (guest.disconnectControlDisabled) {
+                        return;
+                      }
+                      onDisconnectGuest?.(guest.participantId);
+                    }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    className={`${pillBaseClassName} border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition ${
+                      guest.disconnectControlDisabled
+                        ? "cursor-default opacity-40"
+                        : "hover:bg-slate-500"
+                    }`}
+                  >
+                    Déconnecter
+                  </button>
                 </div>
               ) : (
-                <div className="pointer-events-none absolute right-4 top-4 z-20">
-                  <ConnectionQualityIndicator quality={guest.connectionQuality} />
+                <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-2">
+                  <div className="pointer-events-none">
+                    <ConnectionQualityIndicator quality={guest.connectionQuality} />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={guest.disconnectControlDisabled}
+                    title={
+                      guest.disconnectControlDisabled
+                        ? "Retirez l’invité du programme avant de le déconnecter."
+                        : undefined
+                    }
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (guest.disconnectControlDisabled) {
+                        return;
+                      }
+                      onDisconnectGuest?.(guest.participantId);
+                    }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    className={`${pillBaseClassName} border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition ${
+                      guest.disconnectControlDisabled
+                        ? "cursor-default opacity-40"
+                        : "hover:bg-slate-500"
+                    }`}
+                  >
+                    Déconnecter
+                  </button>
                 </div>
               )}
 
@@ -2917,29 +2969,6 @@ function ControlGuestGridContent({
                         }`}
                       >
                         Fond
-                      </button>
-                      <button
-                        type="button"
-                        disabled={guest.disconnectControlDisabled}
-                        title={
-                          guest.disconnectControlDisabled
-                            ? "Retirez l’invité du programme avant de le déconnecter."
-                            : undefined
-                        }
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (guest.disconnectControlDisabled) {
-                            return;
-                          }
-                          onDisconnectGuest?.(guest.participantId);
-                        }}
-                        className={`${pillBaseClassName} border-transparent bg-slate-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition ${
-                          guest.disconnectControlDisabled
-                            ? "cursor-default opacity-40"
-                            : "hover:bg-slate-500"
-                        }`}
-                      >
-                        Déconnecter
                       </button>
                     </div>
                   </div>
