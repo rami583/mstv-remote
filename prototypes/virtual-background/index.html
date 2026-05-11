@@ -115,12 +115,35 @@
         position: relative;
         aspect-ratio: 16 / 9;
         background: #000;
+        overflow: hidden;
       }
 
       canvas {
         display: block;
         width: 100%;
         height: 100%;
+      }
+
+      .output-canvas,
+      .background-layer,
+      .foreground-layer {
+        position: absolute;
+        inset: 0;
+      }
+
+      .background-layer,
+      .foreground-layer {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .canvas-wrap.layered-blur .output-canvas {
+        opacity: 0;
+      }
+
+      .canvas-wrap.layered-blur .background-layer,
+      .canvas-wrap.layered-blur .foreground-layer {
+        opacity: 1;
       }
 
       video {
@@ -248,6 +271,23 @@
         line-height: 1.45;
       }
 
+      .method-label {
+        position: absolute;
+        left: 14px;
+        top: 14px;
+        z-index: 5;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 0.62);
+        padding: 7px 10px;
+        color: white;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        backdrop-filter: blur(8px);
+      }
+
       .note {
         margin-top: 14px;
         color: var(--muted);
@@ -289,6 +329,11 @@
     </style>
   </head>
   <body>
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position: absolute">
+      <filter id="mstv-vb-svg-blur">
+        <feGaussianBlur id="mstv-vb-svg-blur-node" stdDeviation="18" edgeMode="duplicate" />
+      </filter>
+    </svg>
     <div id="root"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
@@ -366,34 +411,216 @@
         ctx.restore();
       }
 
+      const blurEngines = {
+        "canvas-filter": "Canvas ctx.filter",
+        "css-filter": "CSS filtered layer",
+        "svg-filter": "SVG feGaussianBlur",
+        "multi-pass": "Multi-pass canvas",
+        "stackblur": "JS StackBlur-lite",
+      };
+
+      function isLayeredBlurEngine(engine) {
+        return engine === "css-filter" || engine === "svg-filter";
+      }
+
+      function clearCanvas(canvas) {
+        const ctx = canvas?.getContext("2d");
+        if (!canvas || !ctx) {
+          return;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      function resizeLayerCanvas(canvas, width, height) {
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+      }
+
+      function resetLayerStyles(canvas) {
+        if (!canvas) {
+          return;
+        }
+        canvas.style.filter = "";
+        canvas.style.transform = "";
+        canvas.style.transformOrigin = "";
+      }
+
+      function boxBlurChannel(source, target, width, height, radius, channel, horizontal) {
+        const windowSize = radius * 2 + 1;
+        const outer = horizontal ? height : width;
+        const inner = horizontal ? width : height;
+
+        for (let outerIndex = 0; outerIndex < outer; outerIndex += 1) {
+          let sum = 0;
+
+          for (let offset = -radius; offset <= radius; offset += 1) {
+            const innerIndex = Math.min(inner - 1, Math.max(0, offset));
+            const pixelIndex = horizontal
+              ? (outerIndex * width + innerIndex) * 4 + channel
+              : (innerIndex * width + outerIndex) * 4 + channel;
+            sum += source[pixelIndex];
+          }
+
+          for (let innerIndex = 0; innerIndex < inner; innerIndex += 1) {
+            const outputIndex = horizontal
+              ? (outerIndex * width + innerIndex) * 4 + channel
+              : (innerIndex * width + outerIndex) * 4 + channel;
+            target[outputIndex] = sum / windowSize;
+
+            const removeIndex = Math.max(0, innerIndex - radius);
+            const addIndex = Math.min(inner - 1, innerIndex + radius + 1);
+            const removePixelIndex = horizontal
+              ? (outerIndex * width + removeIndex) * 4 + channel
+              : (removeIndex * width + outerIndex) * 4 + channel;
+            const addPixelIndex = horizontal
+              ? (outerIndex * width + addIndex) * 4 + channel
+              : (addIndex * width + outerIndex) * 4 + channel;
+            sum += source[addPixelIndex] - source[removePixelIndex];
+          }
+        }
+      }
+
+      function applyStackBlurLite(imageData, width, height, radius) {
+        const safeRadius = Math.max(1, Math.round(radius));
+        const source = new Uint8ClampedArray(imageData.data);
+        const temp = new Uint8ClampedArray(imageData.data.length);
+        const output = new Uint8ClampedArray(imageData.data.length);
+
+        for (let channel = 0; channel < 3; channel += 1) {
+          boxBlurChannel(source, temp, width, height, safeRadius, channel, true);
+          boxBlurChannel(temp, output, width, height, safeRadius, channel, false);
+        }
+
+        for (let index = 3; index < imageData.data.length; index += 4) {
+          output[index] = source[index];
+        }
+
+        imageData.data.set(output);
+      }
+
+      function drawDownscaledSource(scratchCanvas, source, width, height, scale, ratio) {
+        const scratchWidth = Math.max(2, Math.round(width * ratio));
+        const scratchHeight = Math.max(2, Math.round(height * ratio));
+        resizeLayerCanvas(scratchCanvas, scratchWidth, scratchHeight);
+
+        const scratchCtx = scratchCanvas.getContext("2d", { willReadFrequently: true });
+        if (!scratchCtx) {
+          return null;
+        }
+
+        scratchCtx.save();
+        scratchCtx.clearRect(0, 0, scratchWidth, scratchHeight);
+        scratchCtx.imageSmoothingEnabled = true;
+        scratchCtx.imageSmoothingQuality = "high";
+        drawCenteredScale(
+          scratchCtx,
+          () => drawCover(scratchCtx, source, scratchWidth, scratchHeight),
+          scratchWidth,
+          scratchHeight,
+          scale,
+        );
+        scratchCtx.restore();
+
+        return { scratchCtx, scratchWidth, scratchHeight };
+      }
+
+      function drawMultiPassBlur(ctx, scratchCanvas, source, width, height, scale, blurAmount) {
+        const scratch = drawDownscaledSource(scratchCanvas, source, width, height, scale, 0.42);
+        if (!scratch) {
+          return;
+        }
+
+        const radius = Math.max(1, Math.round(blurAmount * 0.2));
+        const offsets = [
+          [0, 0],
+          [-radius, 0],
+          [radius, 0],
+          [0, -radius],
+          [0, radius],
+          [-radius, -radius],
+          [radius, radius],
+          [-radius, radius],
+          [radius, -radius],
+        ];
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.globalAlpha = 1 / offsets.length;
+        offsets.forEach(([x, y]) => {
+          ctx.drawImage(
+            scratchCanvas,
+            0,
+            0,
+            scratch.scratchWidth,
+            scratch.scratchHeight,
+            x,
+            y,
+            width,
+            height,
+          );
+        });
+        ctx.restore();
+      }
+
+      function drawStackBlurLite(ctx, scratchCanvas, source, width, height, scale, blurAmount) {
+        const ratio = 0.46;
+        const scratch = drawDownscaledSource(scratchCanvas, source, width, height, scale, ratio);
+        if (!scratch) {
+          return;
+        }
+
+        const imageData = scratch.scratchCtx.getImageData(0, 0, scratch.scratchWidth, scratch.scratchHeight);
+        applyStackBlurLite(imageData, scratch.scratchWidth, scratch.scratchHeight, Math.max(2, blurAmount * ratio * 0.45));
+        scratch.scratchCtx.putImageData(imageData, 0, 0);
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(scratchCanvas, 0, 0, scratch.scratchWidth, scratch.scratchHeight, 0, 0, width, height);
+        ctx.restore();
+      }
+
       function App() {
         const videoRef = useRef(null);
         const canvasRef = useRef(null);
+        const backgroundLayerRef = useRef(null);
+        const foregroundLayerRef = useRef(null);
         const segmentationRef = useRef(null);
         const backgroundRef = useRef(createBackgroundImage());
         const backgroundUrlRef = useRef(null);
         const modeRef = useRef("image");
+        const blurEngineRef = useRef("canvas-filter");
         const blurAmountRef = useRef(18);
         const edgeSoftnessRef = useRef(3);
         const maskCanvasRef = useRef(document.createElement("canvas"));
         const personCanvasRef = useRef(document.createElement("canvas"));
         const backgroundCanvasRef = useRef(document.createElement("canvas"));
+        const blurScratchCanvasRef = useRef(document.createElement("canvas"));
         const rafRef = useRef(0);
         const processingRef = useRef(false);
         const framesRef = useRef([]);
         const [streamReady, setStreamReady] = useState(false);
         const [enabled, setEnabled] = useState(true);
         const [mode, setMode] = useState("image");
+        const [blurEngine, setBlurEngine] = useState("canvas-filter");
         const [backgroundName, setBackgroundName] = useState("Professional placeholder");
         const [blurAmount, setBlurAmount] = useState(18);
         const [edgeSoftness, setEdgeSoftness] = useState(3);
         const [fps, setFps] = useState(0);
         const [status, setStatus] = useState("Click Start Camera to begin.");
         const effectiveMode = enabled ? mode : "original";
+        const layeredBlurActive = effectiveMode === "blur" && isLayeredBlurEngine(blurEngine);
 
         useEffect(() => {
           modeRef.current = effectiveMode;
         }, [effectiveMode]);
+
+        useEffect(() => {
+          blurEngineRef.current = blurEngine;
+        }, [blurEngine]);
 
         useEffect(() => {
           blurAmountRef.current = blurAmount;
@@ -493,10 +720,56 @@
 
         function drawOriginal(ctx, source, canvas) {
           resizeCanvasToVideo(canvas, source);
+          clearCanvas(backgroundLayerRef.current);
+          clearCanvas(foregroundLayerRef.current);
+          resetLayerStyles(backgroundLayerRef.current);
+          resetLayerStyles(foregroundLayerRef.current);
           ctx.save();
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           drawCover(ctx, source, canvas.width, canvas.height);
           ctx.restore();
+        }
+
+        function drawLayeredBlur(results, width, height, blurScale, maskCanvas, personCanvas) {
+          const backgroundLayer = backgroundLayerRef.current;
+          const foregroundLayer = foregroundLayerRef.current;
+          const backgroundLayerCtx = backgroundLayer?.getContext("2d");
+          const foregroundLayerCtx = foregroundLayer?.getContext("2d");
+          const engine = blurEngineRef.current;
+
+          if (!backgroundLayer || !foregroundLayer || !backgroundLayerCtx || !foregroundLayerCtx) {
+            return false;
+          }
+
+          resizeLayerCanvas(backgroundLayer, width, height);
+          resizeLayerCanvas(foregroundLayer, width, height);
+
+          backgroundLayerCtx.save();
+          backgroundLayerCtx.clearRect(0, 0, width, height);
+          drawCover(backgroundLayerCtx, results.image, width, height);
+          backgroundLayerCtx.restore();
+
+          foregroundLayerCtx.save();
+          foregroundLayerCtx.clearRect(0, 0, width, height);
+          foregroundLayerCtx.drawImage(personCanvas, 0, 0, width, height);
+          foregroundLayerCtx.restore();
+
+          const svgBlurNode = document.getElementById("mstv-vb-svg-blur-node");
+          if (svgBlurNode) {
+            svgBlurNode.setAttribute("stdDeviation", String(Math.max(0, blurAmountRef.current)));
+          }
+
+          backgroundLayer.style.transformOrigin = "50% 50%";
+          foregroundLayer.style.transformOrigin = "50% 50%";
+          backgroundLayer.style.transform = `scale(${blurScale})`;
+          foregroundLayer.style.transform = `scale(${blurScale})`;
+          backgroundLayer.style.filter =
+            engine === "svg-filter"
+              ? "url(#mstv-vb-svg-blur)"
+              : `blur(${blurAmountRef.current}px)`;
+          foregroundLayer.style.filter = "";
+
+          return true;
         }
 
         function drawResults(results) {
@@ -521,9 +794,11 @@
           const personCanvas = personCanvasRef.current;
           const backgroundCanvas = backgroundCanvasRef.current;
           const blurScale = mode === "blur" ? 1.07 : 1;
+          const blurEngine = blurEngineRef.current;
           const maskCtx = maskCanvas.getContext("2d");
           const personCtx = personCanvas.getContext("2d");
           const backgroundCtx = backgroundCanvas.getContext("2d");
+          const blurScratchCanvas = blurScratchCanvasRef.current;
 
           resizeScratchCanvas(maskCanvas, width, height);
           resizeScratchCanvas(personCanvas, width, height);
@@ -543,26 +818,37 @@
           drawCover(personCtx, results.image, width, height);
           personCtx.restore();
 
+          if (mode === "blur" && isLayeredBlurEngine(blurEngine)) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (drawLayeredBlur(results, width, height, blurScale, maskCanvas, personCanvas)) {
+              return;
+            }
+          }
+
+          clearCanvas(backgroundLayerRef.current);
+          clearCanvas(foregroundLayerRef.current);
+          resetLayerStyles(backgroundLayerRef.current);
+          resetLayerStyles(foregroundLayerRef.current);
+
           backgroundCtx.save();
           backgroundCtx.clearRect(0, 0, width, height);
 
           if (mode === "blur") {
-            drawCenteredScale(
-              backgroundCtx,
-              () => drawCover(backgroundCtx, results.image, width, height),
-              width,
-              height,
-              blurScale,
-            );
-            backgroundCtx.filter = `blur(${blurAmountRef.current}px)`;
-            drawCenteredScale(
-              backgroundCtx,
-              () => drawCover(backgroundCtx, results.image, width, height),
-              width,
-              height,
-              blurScale,
-            );
-            backgroundCtx.filter = "none";
+            if (blurEngine === "multi-pass") {
+              drawMultiPassBlur(backgroundCtx, blurScratchCanvas, results.image, width, height, blurScale, blurAmountRef.current);
+            } else if (blurEngine === "stackblur") {
+              drawStackBlurLite(backgroundCtx, blurScratchCanvas, results.image, width, height, blurScale, blurAmountRef.current);
+            } else {
+              backgroundCtx.filter = `blur(${blurAmountRef.current}px)`;
+              drawCenteredScale(
+                backgroundCtx,
+                () => drawCover(backgroundCtx, results.image, width, height),
+                width,
+                height,
+                blurScale,
+              );
+              backgroundCtx.filter = "none";
+            }
           } else {
             drawCover(backgroundCtx, backgroundRef.current, width, height);
           }
@@ -674,9 +960,16 @@
 
             <section className="layout">
               <div className="stage">
-                <div className="canvas-wrap">
+                <div className={layeredBlurActive ? "canvas-wrap layered-blur" : "canvas-wrap"}>
                   <video ref={videoRef} playsInline muted />
-                  <canvas ref={canvasRef} />
+                  <canvas ref={backgroundLayerRef} className="background-layer" />
+                  <canvas ref={canvasRef} className="output-canvas" />
+                  <canvas ref={foregroundLayerRef} className="foreground-layer" />
+                  {effectiveMode === "blur" ? (
+                    <div className="method-label">
+                      {blurEngines[blurEngine]} · {fps} FPS
+                    </div>
+                  ) : null}
                   {!streamReady ? (
                     <div className="empty">
                       Start the camera to evaluate background replacement quality.
@@ -719,6 +1012,18 @@
                     <option value="original">Original Webcam</option>
                     <option value="blur">Blur Background</option>
                     <option value="image">Image Background</option>
+                  </select>
+
+                  <select
+                    className="select"
+                    value={blurEngine}
+                    onChange={(event) => setBlurEngine(event.target.value)}
+                  >
+                    <option value="canvas-filter">Blur engine: Canvas ctx.filter</option>
+                    <option value="css-filter">Blur engine: CSS filtered layer</option>
+                    <option value="svg-filter">Blur engine: SVG feGaussianBlur</option>
+                    <option value="multi-pass">Blur engine: Multi-pass canvas</option>
+                    <option value="stackblur">Blur engine: StackBlur / JS fallback</option>
                   </select>
 
                   <label className="button" htmlFor="background-upload">
@@ -766,6 +1071,9 @@
 
                   <div className="status">{status}</div>
                   <div className="status">Background: {backgroundName}</div>
+                  <div className="status">
+                    Blur method: {blurEngines[blurEngine]} · {fps} FPS
+                  </div>
                 </div>
 
                 <ul className="checklist">

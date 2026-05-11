@@ -176,6 +176,7 @@ const virtualBackgroundBlurPx = 18;
 const virtualBackgroundEdgeSoftnessPx = 3;
 const virtualBackgroundBlurScale = 1.07;
 const virtualBackgroundSafariBlurDownscale = 0.32;
+const virtualBackgroundSafariSvgBlurMinIntervalMs = 80;
 let canvasBlurFilterEffective: boolean | null = null;
 
 interface SelfieSegmentationResult {
@@ -190,6 +191,15 @@ interface SelfieSegmentationInstance {
   close?: () => void;
 }
 
+interface SvgBlurRendererState {
+  sourceCanvas: HTMLCanvasElement;
+  image: HTMLImageElement | null;
+  pending: boolean;
+  lastRequestAt: number;
+  width: number;
+  height: number;
+}
+
 declare global {
   interface Window {
     SelfieSegmentation?: new (options: {
@@ -197,6 +207,21 @@ declare global {
     }) => SelfieSegmentationInstance;
     __mstvSelfieSegmentationPromise?: Promise<void>;
   }
+}
+
+function isSafariBrowser() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent;
+  const vendor = navigator.vendor;
+
+  return (
+    /Safari/i.test(userAgent) &&
+    /Apple/i.test(vendor) &&
+    !/(Chrome|Chromium|CriOS|FxiOS|Edg|OPR|Android)/i.test(userAgent)
+  );
 }
 
 function loadSelfieSegmentation() {
@@ -230,6 +255,14 @@ function loadSelfieSegmentation() {
   });
 
   return window.__mstvSelfieSegmentationPromise;
+}
+
+function escapeSvgAttribute(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function drawCover(
@@ -374,6 +407,63 @@ function drawSafariCompatibleBlurredCover(
   context.imageSmoothingQuality = "high";
   context.drawImage(scratchCanvas, 0, 0, scratchWidth, scratchHeight, 0, 0, width, height);
   context.restore();
+}
+
+function drawSafariSvgBlurredCover(
+  context: CanvasRenderingContext2D,
+  state: SvgBlurRendererState,
+  image: CanvasImageSource,
+  width: number,
+  height: number,
+  scale: number,
+  blurPx: number
+) {
+  const sourceContext = state.sourceCanvas.getContext("2d");
+  const now = performance.now();
+
+  if (!sourceContext) {
+    return false;
+  }
+
+  if (state.sourceCanvas.width !== width || state.sourceCanvas.height !== height) {
+    state.sourceCanvas.width = width;
+    state.sourceCanvas.height = height;
+    state.image = null;
+    state.pending = false;
+    state.width = width;
+    state.height = height;
+  }
+
+  if (!state.pending && now - state.lastRequestAt >= virtualBackgroundSafariSvgBlurMinIntervalMs) {
+    state.lastRequestAt = now;
+    state.pending = true;
+
+    sourceContext.save();
+    sourceContext.clearRect(0, 0, width, height);
+    drawCenteredScale(sourceContext, () => drawCover(sourceContext, image, width, height), width, height, scale);
+    sourceContext.restore();
+
+    const frameDataUrl = state.sourceCanvas.toDataURL("image/jpeg", 0.82);
+    const escapedFrameDataUrl = escapeSvgAttribute(frameDataUrl);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><defs><filter id="mstv-safari-blur" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${blurPx}" edgeMode="duplicate"/></filter></defs><image href="${escapedFrameDataUrl}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="none" filter="url(#mstv-safari-blur)"/></svg>`;
+    const svgImage = new Image();
+
+    svgImage.onload = () => {
+      state.image = svgImage;
+      state.pending = false;
+    };
+    svgImage.onerror = () => {
+      state.pending = false;
+    };
+    svgImage.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+
+  if (!state.image) {
+    return false;
+  }
+
+  context.drawImage(state.image, 0, 0, width, height);
+  return true;
 }
 
 function createMessageId() {
@@ -686,6 +776,7 @@ function GuestVirtualBackgroundPublisher({
     let personCanvas: HTMLCanvasElement | null = null;
     let backgroundCanvas: HTMLCanvasElement | null = null;
     let blurFallbackCanvas: HTMLCanvasElement | null = null;
+    let safariSvgBlurState: SvgBlurRendererState | null = null;
     let imageElement: HTMLImageElement | null = null;
     let segmentation: SelfieSegmentationInstance | null = null;
     let processing = false;
@@ -762,7 +853,40 @@ function GuestVirtualBackgroundPublisher({
       backgroundContext.clearRect(0, 0, width, height);
 
       if (mode === "blur") {
-        if (isCanvasBlurFilterEffective()) {
+        if (isSafariBrowser()) {
+          safariSvgBlurState ??= {
+            sourceCanvas: document.createElement("canvas"),
+            image: null,
+            pending: false,
+            lastRequestAt: 0,
+            width,
+            height
+          };
+
+          const didDrawSvgBlur = drawSafariSvgBlurredCover(
+            backgroundContext,
+            safariSvgBlurState,
+            results.image,
+            width,
+            height,
+            virtualBackgroundBlurScale,
+            virtualBackgroundBlurPx
+          );
+
+          if (!didDrawSvgBlur) {
+            // The first SVG frame is asynchronous. Use the old canvas fallback only until
+            // Safari has a blurred SVG frame ready, then keep the foreground compositing sharp.
+            blurFallbackCanvas ??= document.createElement("canvas");
+            drawSafariCompatibleBlurredCover(
+              backgroundContext,
+              blurFallbackCanvas,
+              results.image,
+              width,
+              height,
+              virtualBackgroundBlurScale
+            );
+          }
+        } else if (isCanvasBlurFilterEffective()) {
           backgroundContext.filter = `blur(${virtualBackgroundBlurPx}px)`;
           drawCenteredScale(
             backgroundContext,

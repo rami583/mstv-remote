@@ -22,6 +22,12 @@ Pipeline:
    - blurred background
    - professional image background
 5. Approximate FPS display
+6. Safari blur engine comparison:
+   - Canvas `ctx.filter`
+   - CSS filtered layer
+   - SVG `feGaussianBlur`
+   - multi-pass canvas approximation
+   - lightweight JS blur fallback
 
 Rendering note:
 
@@ -31,6 +37,7 @@ Rendering note:
 Controls:
 
 - `Choisir une image de fond`: import a JPG, PNG or WebP background image for image mode
+- `Blur engine`: switch blur implementations live, useful for Safari comparison
 - `Blur amount`: adjust visible webcam background blur
 - `Edge softness`: feather the segmentation mask to reduce hard/jagged contours
 
