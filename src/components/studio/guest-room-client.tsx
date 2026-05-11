@@ -937,9 +937,23 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               <button
                 type="button"
                 onClick={handleTogglePrivateChat}
-                className="relative rounded-2xl border border-transparent bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition before:absolute before:-bottom-1.5 before:left-2 before:h-3 before:w-3.5 before:origin-top-right before:-rotate-[32deg] before:rounded-bl-full before:bg-sky-500 before:transition before:content-[''] hover:bg-sky-400 hover:before:bg-sky-400"
+                className="relative h-[31px] w-[50px] border-0 bg-transparent p-0 text-[11px] font-bold uppercase tracking-[0.12em] text-sky-500 shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition hover:text-sky-400"
+                aria-label="Ouvrir le chat"
               >
-                Chat
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 184.5 114.4803"
+                  className="absolute inset-0 h-full w-full"
+                  preserveAspectRatio="none"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M138.9575,0H45.5425C20.3901,0,0,20.3901,0,45.5425h0c0,19.5757,12.3527,36.2625,29.6868,42.7016v21.2811c0,2.7366,2.2184,4.9551,4.955,4.9551h0c16.1733,0,30.0972-9.5933,36.418-23.3952h67.8976c25.1524,0,45.5425-20.3901,45.5425-45.5425h0c0-25.1525-20.3901-45.5425-45.5425-45.5425Z"
+                  />
+                </svg>
+                <span className="relative z-10 block pb-0.5 text-center leading-[31px] text-white">
+                  Chat
+                </span>
               </button>
             )}
           </div>
