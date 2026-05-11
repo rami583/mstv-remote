@@ -95,24 +95,6 @@ function LocalPreviewGuide() {
   );
 }
 
-function ChatBubbleIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-3.5 w-3.5 shrink-0"
-      fill="none"
-    >
-      <path
-        d="M5.6 5.2h12.8c1.45 0 2.6 1.12 2.6 2.5v6.7c0 1.38-1.15 2.5-2.6 2.5H10l-4.75 3.35c-.45.32-1.08-.02-1.08-.56V16.7C3.06 16.18 2.2 15.2 2.2 14.05V7.7c0-1.38 1.15-2.5 2.6-2.5h.8Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function LocalStreamPreview({ stream }: { stream: MediaStream }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -955,9 +937,8 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               <button
                 type="button"
                 onClick={handleTogglePrivateChat}
-                className="inline-flex items-center gap-1.5 rounded-full border border-transparent bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition hover:bg-sky-400"
+                className="relative rounded-2xl border border-transparent bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition before:absolute before:-bottom-1 before:left-2 before:h-3 before:w-3 before:rounded-bl-[10px] before:bg-sky-500 before:transition before:content-[''] hover:bg-sky-400 hover:before:bg-sky-400"
               >
-                <ChatBubbleIcon />
                 Chat
               </button>
             )}
