@@ -175,7 +175,7 @@ const virtualBackgroundFps = 25;
 const virtualBackgroundBlurPx = 18;
 const virtualBackgroundEdgeSoftnessPx = 3;
 const virtualBackgroundBlurScale = 1.07;
-const virtualBackgroundSafariBlurDownscale = 0.14;
+const virtualBackgroundSafariBlurDownscale = 0.32;
 let canvasBlurFilterEffective: boolean | null = null;
 
 interface SelfieSegmentationResult {
