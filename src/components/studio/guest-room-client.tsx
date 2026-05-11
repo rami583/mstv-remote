@@ -937,13 +937,13 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               <button
                 type="button"
                 onClick={handleTogglePrivateChat}
-                className="relative h-[31px] w-[50px] border-0 bg-transparent p-0 text-[11px] font-bold uppercase tracking-[0.12em] text-sky-500 shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition hover:text-sky-400"
+                className="relative h-[31px] w-[50px] border-0 bg-transparent p-0 text-[11px] font-bold uppercase tracking-[0.12em] text-sky-500 transition hover:text-sky-400"
                 aria-label="Ouvrir le chat"
               >
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 184.5 114.4803"
-                  className="absolute inset-0 h-full w-full"
+                  className="absolute inset-0 h-full w-full drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
                   preserveAspectRatio="none"
                 >
                   <path
