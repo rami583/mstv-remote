@@ -677,13 +677,6 @@ function GuestVirtualBackgroundPublisher({
       backgroundContext.clearRect(0, 0, width, height);
 
       if (mode === "blur") {
-        drawCenteredScale(
-          backgroundContext,
-          () => drawCover(backgroundContext, results.image, width, height),
-          width,
-          height,
-          virtualBackgroundBlurScale
-        );
         backgroundContext.filter = `blur(${virtualBackgroundBlurPx}px)`;
         drawCenteredScale(
           backgroundContext,
