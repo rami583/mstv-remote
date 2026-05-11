@@ -937,7 +937,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
               <button
                 type="button"
                 onClick={handleTogglePrivateChat}
-                className="relative rounded-2xl border border-transparent bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition before:absolute before:-bottom-1 before:left-2 before:h-3 before:w-3 before:rounded-bl-[10px] before:bg-sky-500 before:transition before:content-[''] hover:bg-sky-400 hover:before:bg-sky-400"
+                className="relative rounded-2xl border border-transparent bg-sky-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition before:absolute before:-bottom-1.5 before:left-2 before:h-3 before:w-3.5 before:origin-top-right before:-rotate-[32deg] before:rounded-bl-full before:bg-sky-500 before:transition before:content-[''] hover:bg-sky-400 hover:before:bg-sky-400"
               >
                 Chat
               </button>
