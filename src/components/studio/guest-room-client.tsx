@@ -951,7 +951,7 @@ export function GuestRoomClient({ room }: GuestRoomClientProps) {
                     d="M138.9575,0H45.5425C20.3901,0,0,20.3901,0,45.5425h0c0,19.5757,12.3527,36.2625,29.6868,42.7016v21.2811c0,2.7366,2.2184,4.9551,4.955,4.9551h0c16.1733,0,30.0972-9.5933,36.418-23.3952h67.8976c25.1524,0,45.5425-20.3901,45.5425-45.5425h0c0-25.1525-20.3901-45.5425-45.5425-45.5425Z"
                   />
                 </svg>
-                <span className="absolute inset-x-0 top-[38%] z-10 -translate-y-1/2 text-center leading-none text-white">
+                <span className="absolute inset-x-0 top-[42%] z-10 -translate-y-1/2 text-center leading-none text-white">
                   Chat
                 </span>
               </button>
