@@ -175,6 +175,8 @@ const virtualBackgroundFps = 25;
 const virtualBackgroundBlurPx = 18;
 const virtualBackgroundEdgeSoftnessPx = 3;
 const virtualBackgroundBlurScale = 1.07;
+const virtualBackgroundSafariBlurDownscale = 0.14;
+let canvasBlurFilterEffective: boolean | null = null;
 
 interface SelfieSegmentationResult {
   image: CanvasImageSource;
@@ -289,6 +291,88 @@ function drawCenteredScale(
   context.scale(scale, scale);
   context.translate(-width / 2, -height / 2);
   draw();
+  context.restore();
+}
+
+function isCanvasBlurFilterEffective() {
+  if (canvasBlurFilterEffective !== null) {
+    return canvasBlurFilterEffective;
+  }
+
+  if (typeof document === "undefined") {
+    canvasBlurFilterEffective = false;
+    return canvasBlurFilterEffective;
+  }
+
+  const sourceCanvas = document.createElement("canvas");
+  const testCanvas = document.createElement("canvas");
+  sourceCanvas.width = 9;
+  sourceCanvas.height = 9;
+  testCanvas.width = 9;
+  testCanvas.height = 9;
+
+  const sourceContext = sourceCanvas.getContext("2d");
+  const testContext = testCanvas.getContext("2d", { willReadFrequently: true });
+
+  if (!sourceContext || !testContext || !("filter" in testContext)) {
+    canvasBlurFilterEffective = false;
+    return canvasBlurFilterEffective;
+  }
+
+  try {
+    sourceContext.fillStyle = "#ffffff";
+    sourceContext.fillRect(4, 4, 1, 1);
+    testContext.filter = "blur(2px)";
+    testContext.drawImage(sourceCanvas, 0, 0);
+    testContext.filter = "none";
+
+    canvasBlurFilterEffective = testContext.getImageData(2, 4, 1, 1).data[3] > 0;
+  } catch {
+    canvasBlurFilterEffective = false;
+  }
+
+  return canvasBlurFilterEffective;
+}
+
+function drawSafariCompatibleBlurredCover(
+  context: CanvasRenderingContext2D,
+  scratchCanvas: HTMLCanvasElement,
+  image: CanvasImageSource,
+  width: number,
+  height: number,
+  scale: number
+) {
+  const scratchWidth = Math.max(2, Math.round(width * virtualBackgroundSafariBlurDownscale));
+  const scratchHeight = Math.max(2, Math.round(height * virtualBackgroundSafariBlurDownscale));
+  const scratchContext = scratchCanvas.getContext("2d");
+
+  if (!scratchContext) {
+    drawCenteredScale(context, () => drawCover(context, image, width, height), width, height, scale);
+    return;
+  }
+
+  if (scratchCanvas.width !== scratchWidth || scratchCanvas.height !== scratchHeight) {
+    scratchCanvas.width = scratchWidth;
+    scratchCanvas.height = scratchHeight;
+  }
+
+  scratchContext.save();
+  scratchContext.clearRect(0, 0, scratchWidth, scratchHeight);
+  scratchContext.imageSmoothingEnabled = true;
+  scratchContext.imageSmoothingQuality = "high";
+  drawCenteredScale(
+    scratchContext,
+    () => drawCover(scratchContext, image, scratchWidth, scratchHeight),
+    scratchWidth,
+    scratchHeight,
+    scale
+  );
+  scratchContext.restore();
+
+  context.save();
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(scratchCanvas, 0, 0, scratchWidth, scratchHeight, 0, 0, width, height);
   context.restore();
 }
 
@@ -601,6 +685,7 @@ function GuestVirtualBackgroundPublisher({
     let maskCanvas: HTMLCanvasElement | null = null;
     let personCanvas: HTMLCanvasElement | null = null;
     let backgroundCanvas: HTMLCanvasElement | null = null;
+    let blurFallbackCanvas: HTMLCanvasElement | null = null;
     let imageElement: HTMLImageElement | null = null;
     let segmentation: SelfieSegmentationInstance | null = null;
     let processing = false;
@@ -677,15 +762,29 @@ function GuestVirtualBackgroundPublisher({
       backgroundContext.clearRect(0, 0, width, height);
 
       if (mode === "blur") {
-        backgroundContext.filter = `blur(${virtualBackgroundBlurPx}px)`;
-        drawCenteredScale(
-          backgroundContext,
-          () => drawCover(backgroundContext, results.image, width, height),
-          width,
-          height,
-          virtualBackgroundBlurScale
-        );
-        backgroundContext.filter = "none";
+        if (isCanvasBlurFilterEffective()) {
+          backgroundContext.filter = `blur(${virtualBackgroundBlurPx}px)`;
+          drawCenteredScale(
+            backgroundContext,
+            () => drawCover(backgroundContext, results.image, width, height),
+            width,
+            height,
+            virtualBackgroundBlurScale
+          );
+          backgroundContext.filter = "none";
+        } else {
+          // Safari can segment correctly but ignore 2D canvas blur filters. Downscale/upscale
+          // the webcam background as a visual-only fallback, then composite the sharp person.
+          blurFallbackCanvas ??= document.createElement("canvas");
+          drawSafariCompatibleBlurredCover(
+            backgroundContext,
+            blurFallbackCanvas,
+            results.image,
+            width,
+            height,
+            virtualBackgroundBlurScale
+          );
+        }
       } else if (imageElement) {
         drawCover(backgroundContext, imageElement, width, height);
       } else {
@@ -780,6 +879,7 @@ function GuestVirtualBackgroundPublisher({
         maskCanvas = document.createElement("canvas");
         personCanvas = document.createElement("canvas");
         backgroundCanvas = document.createElement("canvas");
+        blurFallbackCanvas = document.createElement("canvas");
         outputCanvas.width = width;
         outputCanvas.height = height;
 
