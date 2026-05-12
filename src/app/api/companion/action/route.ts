@@ -46,22 +46,26 @@ const companionActionSchema = z.union([
   acknowledgeActionSchema
 ]);
 
-function isLocalRequest(request: Request) {
-  const hostname = new URL(request.url).hostname;
+function isCompanionNetworkRequest(request: Request) {
+  const hostname = new URL(request.url).hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const privateIpv4Pattern =
+    /^(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|169\.254\.\d{1,3}\.\d{1,3})$/;
 
   return (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
     hostname === "::1" ||
-    hostname === "[::1]"
+    hostname === "0.0.0.0" ||
+    hostname.endsWith(".local") ||
+    privateIpv4Pattern.test(hostname)
   );
 }
 
 export async function GET(request: Request) {
-  if (!isLocalRequest(request)) {
+  if (!isCompanionNetworkRequest(request)) {
     return NextResponse.json(
       {
-        error: "Companion API is local only."
+        error: "Companion API is LAN only."
       },
       { status: 403 }
     );
@@ -75,10 +79,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isLocalRequest(request)) {
+  if (!isCompanionNetworkRequest(request)) {
     return NextResponse.json(
       {
-        error: "Companion API is local only."
+        error: "Companion API is LAN only."
       },
       { status: 403 }
     );

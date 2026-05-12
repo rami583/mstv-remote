@@ -2465,7 +2465,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
                 }}
                 className={`mstv-ui-button border transition ${
                   pipModeEnabled
-                    ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-400"
+                    ? "border-signal bg-signal text-white hover:bg-signal/90"
                     : "border-white/10 bg-white/10 text-slate-300 hover:border-white/20 hover:text-white"
                 }`}
               >
@@ -2530,7 +2530,7 @@ export function ControlRoomClient({ room }: ControlRoomClientProps) {
               }}
               className={`mstv-ui-button ml-auto border transition ${
                 pipModeEnabled
-                  ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-400"
+                  ? "border-signal bg-signal text-white hover:bg-signal/90"
                   : "border-white/10 bg-white/10 text-slate-300 hover:border-white/20 hover:text-white"
               }`}
             >

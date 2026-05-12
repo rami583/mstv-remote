@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "../..");
 const port = Number(process.env.MSTV_DESKTOP_PORT || 3100);
 const host = "127.0.0.1";
+const bindHost = "0.0.0.0";
 const baseUrl = `http://${host}:${port}`;
 const nextBin = path.join(projectRoot, "node_modules/next/dist/bin/next");
 const electronBin = path.join(projectRoot, "node_modules/.bin/electron");
@@ -119,7 +120,7 @@ function waitForServer(url, timeoutMs = 45_000) {
 
 const desktopEnv = loadDevEnvironment();
 
-const nextProcess = spawn(process.execPath, [nextBin, "dev", "-H", host, "-p", String(port)], {
+const nextProcess = spawn(process.execPath, [nextBin, "dev", "-H", bindHost, "-p", String(port)], {
   cwd: projectRoot,
   stdio: "inherit",
   env: {

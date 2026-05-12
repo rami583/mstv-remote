@@ -7,6 +7,7 @@ const APP_NAME = "MSTV Visio";
 const DEFAULT_ROOM = "studio";
 const DEFAULT_PORT = 3100;
 const SERVER_HOST = "127.0.0.1";
+const SERVER_BIND_HOST = "0.0.0.0";
 const REQUIRED_ENV_KEYS = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"];
 const DESKTOP_CONFIG_ENV_KEYS = [
   "GUEST_PUBLIC_BASE_URL",
@@ -541,6 +542,7 @@ function startBundledNextServer() {
   const port = getDesktopPort();
   log("Starting bundled Next server", {
     serverPath,
+    host: SERVER_BIND_HOST,
     port,
     guestPublicBaseUrlPresent: Boolean(process.env.GUEST_PUBLIC_BASE_URL)
   });
@@ -550,7 +552,7 @@ function startBundledNextServer() {
     env: {
       ...process.env,
       NODE_ENV: "production",
-      HOSTNAME: SERVER_HOST,
+      HOSTNAME: SERVER_BIND_HOST,
       PORT: String(port)
     },
     serviceName: "MSTV Visio Local Server",

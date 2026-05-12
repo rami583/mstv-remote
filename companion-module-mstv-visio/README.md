@@ -40,7 +40,7 @@ Connection fields:
 
 - `MSTV Visio Host`
   - default: `127.0.0.1`
-  - use the IP address or hostname of the Mac running MSTV Visio if Companion runs elsewhere
+  - use the LAN IP address or `.local` hostname of the Mac running MSTV Visio if Companion runs elsewhere
 - `Port`
   - default: `3100`
 
@@ -48,6 +48,13 @@ For the standard one-Mac setup, keep:
 
 ```text
 Host: 127.0.0.1
+Port: 3100
+```
+
+For a two-Mac LAN setup, use the MSTV Visio Mac address, for example:
+
+```text
+Host: 192.168.1.42
 Port: 3100
 ```
 
